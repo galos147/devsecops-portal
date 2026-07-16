@@ -19,5 +19,5 @@ def get_db():
 
 
 def init_db():
-    from app.models import image, vulnerability, code_project, code_issue, pipeline_run, fix_suggestion, sync_job  # noqa
+    from app.models import image, vulnerability, code_project, code_issue, pipeline_run, fix_suggestion, sync_job, image_package, integration_config  # noqa
     Base.metadata.create_all(bind=engine)

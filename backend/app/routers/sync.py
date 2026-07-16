@@ -39,7 +39,7 @@ def trigger_sync(tool: str, db: Session = Depends(get_db)):
     try:
         fn = INTEGRATIONS[tool]
         # Run the async sync function synchronously
-        result = asyncio.run(fn(db)) if tool == "jfrog" else {"records": 0}
+        result = asyncio.run(fn(db))
         records = result.get("records", 0)
         error = result.get("error") or result.get("note")
 

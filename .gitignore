@@ -3,6 +3,9 @@
 .env.jfrog
 k8s/secrets.yaml
 
+# Local tool config
+.claude/
+
 # Python
 __pycache__/
 *.pyc

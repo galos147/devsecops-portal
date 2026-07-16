@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     jfrog_api_key: str = ""
     jfrog_repo: str = "docker-local"
     sonar_url: str = ""
+    sonar_public_url: str = ""
     sonar_token: str = ""
     prisma_url: str = ""
     prisma_access_key: str = ""

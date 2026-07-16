@@ -11,6 +11,8 @@ class CodeProjectOut(BaseModel):
     vulnerabilities: int
     code_smells: int
     coverage: float
+    hotspots: int = 0
+    sonar_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -31,3 +33,12 @@ class CodeIssueOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RuleInfoOut(BaseModel):
+    rule_id: str
+    name: Optional[str]
+    type: Optional[str]
+    remediation_effort: Optional[str]
+    description: Optional[str]
+    rule_url: Optional[str]

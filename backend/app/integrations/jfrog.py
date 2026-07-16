@@ -14,21 +14,32 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.integrations import config_resolver
 from app.models.image import Image, ImageSource
 from app.models.vulnerability import Vulnerability, Severity, VulnStatus
 from app.models.fix_suggestion import FixSuggestion
+from app.models.image_package import ImagePackage
 
 
-def _auth() -> tuple[str, str]:
-    return (settings.jfrog_username, settings.jfrog_password)
+def _artif(base_url: str, path: str) -> str:
+    return f"{base_url}/artifactory/{path}"
 
 
-def _artif(path: str) -> str:
-    return f"{settings.jfrog_url}/artifactory/{path}"
+def _xray(base_url: str, path: str) -> str:
+    return f"{base_url}/xray/{path}"
 
 
-def _xray(path: str) -> str:
-    return f"{settings.jfrog_url}/xray/{path}"
+async def test_connection(url: str, username: str, secret: str) -> dict:
+    if not url or not secret:
+        return {"ok": False, "message": "URL and password/API key are required"}
+    try:
+        async with httpx.AsyncClient(auth=(username, secret), timeout=10, verify=False) as client:
+            resp = await client.get(_artif(url.rstrip("/"), "api/system/ping"))
+    except httpx.HTTPError as e:
+        return {"ok": False, "message": f"Connection failed: {e}"}
+    if resp.status_code == 200:
+        return {"ok": True, "message": "Connected to JFrog Artifactory"}
+    return {"ok": False, "message": f"JFrog responded with {resp.status_code}"}
 
 
 def _img_id(name: str, tag: str) -> str:
@@ -40,15 +51,17 @@ def _vuln_id(img_id: str, cve_id: str, pkg: str) -> str:
 
 
 async def sync(db: Session) -> dict:
-    if not settings.jfrog_url or not settings.jfrog_password:
-        return {"records": 0, "note": "JFROG_URL / JFROG_PASSWORD not configured"}
+    cfg = config_resolver.resolve(db, "jfrog")
+    if cfg["source"] == "none":
+        return {"records": 0, "note": "JFrog not configured"}
 
-    repo = settings.jfrog_repo
+    base_url = cfg["url"]
+    repo = cfg["extra"] or settings.jfrog_repo
     records = 0
 
-    async with httpx.AsyncClient(auth=_auth(), timeout=30, verify=False) as client:
+    async with httpx.AsyncClient(auth=(cfg["username"], cfg["secret"]), timeout=30, verify=False) as client:
         # 1. List image names in the repo
-        catalog_resp = await client.get(_artif(f"api/docker/{repo}/v2/_catalog"))
+        catalog_resp = await client.get(_artif(base_url, f"api/docker/{repo}/v2/_catalog"))
         if catalog_resp.status_code != 200:
             return {"records": 0, "error": f"Catalog fetch failed: {catalog_resp.status_code}"}
 
@@ -56,7 +69,7 @@ async def sync(db: Session) -> dict:
 
         for img_name in image_names:
             # 2. List tags for each image
-            tags_resp = await client.get(_artif(f"api/docker/{repo}/v2/{img_name}/tags/list"))
+            tags_resp = await client.get(_artif(base_url, f"api/docker/{repo}/v2/{img_name}/tags/list"))
             if tags_resp.status_code != 200:
                 continue
             tags: list[str] = tags_resp.json().get("tags") or []
@@ -66,7 +79,7 @@ async def sync(db: Session) -> dict:
 
                 # 3. Get manifest to extract sha256 digest
                 manifest_resp = await client.get(
-                    _artif(f"api/storage/{repo}/{img_name}/{tag}/manifest.json")
+                    _artif(base_url, f"api/storage/{repo}/{img_name}/{tag}/manifest.json")
                 )
                 digest = None
                 size_mb = None
@@ -84,7 +97,7 @@ async def sync(db: Session) -> dict:
                         id=img_id,
                         name=img_name,
                         tag=tag,
-                        registry=settings.jfrog_url.replace("http://", "").replace("https://", ""),
+                        registry=base_url.replace("http://", "").replace("https://", ""),
                         digest=f"sha256:{digest}" if digest else None,
                         size_mb=size_mb,
                         last_scanned_at=datetime.utcnow(),
@@ -105,7 +118,7 @@ async def sync(db: Session) -> dict:
                     ]}
 
                 xray_resp = await client.post(
-                    _xray("api/v1/summary/artifact"),
+                    _xray(base_url, "api/v1/summary/artifact"),
                     json=xray_payload,
                 )
                 if xray_resp.status_code != 200:
@@ -117,6 +130,32 @@ async def sync(db: Session) -> dict:
                 artifacts = xray_data.get("artifacts", [])
 
                 for artifact in artifacts:
+                    # Extract package inventory from Xray components
+                    all_components = artifact.get("components", [])
+                    for comp in all_components:
+                        comp_id = comp.get("component_id", "")
+                        pkg_type = comp.get("package_type", "").lower()
+                        licenses = comp.get("licenses", [])
+                        license_str = licenses[0] if licenses else None
+                        # component_id format: "deb://name:version" or "gav://group:name:version"
+                        parts = comp_id.split("://", 1)
+                        name_ver = parts[1] if len(parts) > 1 else comp_id
+                        name_parts = name_ver.rsplit(":", 1)
+                        pkg_name = name_parts[0] if name_parts else name_ver
+                        pkg_ver = name_parts[1] if len(name_parts) > 1 else ""
+
+                        pkg_db_id = hashlib.md5(f"pkg:{img_id}:{comp_id}".encode()).hexdigest()[:16]
+                        if not db.query(ImagePackage).filter(ImagePackage.id == pkg_db_id).first():
+                            db.add(ImagePackage(
+                                id=pkg_db_id,
+                                image_id=img_id,
+                                name=pkg_name or comp.get("name", "unknown"),
+                                version=pkg_ver or comp.get("version", ""),
+                                pkg_type=pkg_type or "unknown",
+                                license=license_str,
+                                source_tool="jfrog",
+                            ))
+
                     issues = artifact.get("issues", [])
                     for issue in issues:
                         cves = issue.get("cves", [])

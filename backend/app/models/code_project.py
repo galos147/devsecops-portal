@@ -13,3 +13,5 @@ class CodeProject(Base):
     vulnerabilities = Column(Integer, default=0)
     code_smells = Column(Integer, default=0)
     coverage = Column(Float, default=0.0)
+    hotspots = Column(Integer, default=0)
+    sonar_url = Column(String)

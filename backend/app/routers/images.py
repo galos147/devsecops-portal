@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
+from fastapi import HTTPException
 from app.database import get_db
 from app.models.image import Image
 from app.models.vulnerability import Vulnerability
-from app.schemas.image import ImageOut, ImageDetailOut, VulnCount, VulnOut
+from app.models.image_package import ImagePackage
+from app.schemas.image import ImageOut, ImageDetailOut, VulnCount, VulnOut, PackageOut
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
@@ -61,11 +63,45 @@ def list_images(
     return results
 
 
+@router.get("/{image_id}/packages", response_model=list[PackageOut])
+def get_image_packages(image_id: str, db: Session = Depends(get_db)):
+    if not db.query(Image).filter(Image.id == image_id).first():
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    pkgs = db.query(ImagePackage).filter(ImagePackage.image_id == image_id).all()
+
+    SEV_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+    # Enrich each package with its highest severity CVE from the vulnerabilities table
+    results = []
+    for pkg in pkgs:
+        vulns = db.query(Vulnerability).filter(
+            Vulnerability.image_id == image_id,
+            Vulnerability.package_name == pkg.name,
+            Vulnerability.status == "open",
+        ).all()
+
+        best_vuln = max(vulns, key=lambda v: SEV_RANK.get(v.severity, 0), default=None) if vulns else None
+
+        results.append(PackageOut(
+            id=pkg.id,
+            name=pkg.name,
+            version=pkg.version,
+            pkg_type=pkg.pkg_type,
+            license=pkg.license,
+            source_tool=pkg.source_tool,
+            vuln_severity=best_vuln.severity if best_vuln else None,
+            fix_version=best_vuln.fixed_version if best_vuln else None,
+        ))
+
+    results.sort(key=lambda p: SEV_RANK.get(p.vuln_severity or "", 0), reverse=True)
+    return results
+
+
 @router.get("/{image_id}", response_model=ImageDetailOut)
 def get_image(image_id: str, db: Session = Depends(get_db)):
     img = db.query(Image).filter(Image.id == image_id).first()
     if not img:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Image not found")
 
     vulns = db.query(Vulnerability).filter(Vulnerability.image_id == image_id).all()

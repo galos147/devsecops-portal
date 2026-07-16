@@ -43,3 +43,17 @@ class VulnOut(BaseModel):
 
 class ImageDetailOut(ImageOut):
     vulnerabilities: list[VulnOut] = []
+
+
+class PackageOut(BaseModel):
+    id: str
+    name: str
+    version: Optional[str]
+    pkg_type: Optional[str]
+    license: Optional[str]
+    source_tool: Optional[str]
+    vuln_severity: Optional[str] = None   # highest severity CVE on this package in this image
+    fix_version: Optional[str] = None     # from vulnerability record
+
+    class Config:
+        from_attributes = True

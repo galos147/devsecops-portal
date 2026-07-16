@@ -11,6 +11,7 @@ export interface FixPanelData {
   suggestion?: string;
   copyCmd?: string;
   advisoryUrl?: string;
+  advisoryLabel?: string;
 }
 
 interface Props {
@@ -58,7 +59,7 @@ export default function FixPanel({ data, onClose }: Props) {
             </button>
           )}
           {data.advisoryUrl && (
-            <a href={data.advisoryUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, alignSelf: "center", color: C.accentFg }}>Advisory ↗</a>
+            <a href={data.advisoryUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, alignSelf: "center", color: C.accentFg }}>{data.advisoryLabel ?? "Advisory ↗"}</a>
           )}
         </div>
       </div>

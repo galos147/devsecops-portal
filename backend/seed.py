@@ -13,6 +13,7 @@ from app.models.code_issue import CodeIssue
 from app.models.pipeline_run import PipelineRun
 from app.models.fix_suggestion import FixSuggestion
 from app.models.sync_job import SyncJob
+from app.models.image_package import ImagePackage
 
 
 def dt(s):
@@ -124,12 +125,17 @@ def seed():
     db = SessionLocal()
 
     try:
-        if db.query(Image).count() > 0:
+        has_images = db.query(Image).count() > 0
+        has_packages = db.query(ImagePackage).count() > 0
+
+        if has_images and has_packages:
             print("Database already seeded. Skipping.")
             return
 
-        print("Seeding images...")
-        for d in IMAGES:
+        if not has_images:
+          print("Seeding images...")
+        if not has_images:
+          for d in IMAGES:
             db.add(Image(
                 id=d["id"], name=d["name"], tag=d["tag"], registry=d["registry"],
                 digest=d["digest"], size_mb=d["size_mb"],
@@ -185,6 +191,54 @@ def seed():
                 secret_detection=d["secret_detection"], findings=d["findings"],
             ))
 
+        print("Seeding image packages...")
+        PACKAGES = [
+            # JFrog images
+            {"id": "pkg-1",  "image_id": "img-1",  "name": "openssl",      "version": "3.0.6",   "pkg_type": "deb", "license": "Apache-2.0",  "source_tool": "jfrog"},
+            {"id": "pkg-2",  "image_id": "img-1",  "name": "curl",         "version": "8.1.0",   "pkg_type": "deb", "license": "MIT",         "source_tool": "jfrog"},
+            {"id": "pkg-3",  "image_id": "img-1",  "name": "log4j-core",   "version": "2.14.1",  "pkg_type": "jar", "license": "Apache-2.0",  "source_tool": "jfrog"},
+            {"id": "pkg-4",  "image_id": "img-1",  "name": "python3.11",   "version": "3.11.4",  "pkg_type": "deb", "license": "PSF",         "source_tool": "jfrog"},
+            {"id": "pkg-5",  "image_id": "img-1",  "name": "alpine-base",  "version": "3.18.0",  "pkg_type": "apk", "license": "MIT",         "source_tool": "jfrog"},
+            {"id": "pkg-6",  "image_id": "img-2",  "name": "xz-utils",     "version": "5.6.0",   "pkg_type": "deb", "license": "GPL-2.0",     "source_tool": "jfrog"},
+            {"id": "pkg-7",  "image_id": "img-2",  "name": "curl",         "version": "8.1.0",   "pkg_type": "deb", "license": "MIT",         "source_tool": "jfrog"},
+            {"id": "pkg-8",  "image_id": "img-2",  "name": "openssl",      "version": "3.0.6",   "pkg_type": "deb", "license": "Apache-2.0",  "source_tool": "jfrog"},
+            {"id": "pkg-9",  "image_id": "img-2",  "name": "node",         "version": "20.0.0",  "pkg_type": "deb", "license": "MIT",         "source_tool": "jfrog"},
+            # Prisma images
+            {"id": "pkg-10", "image_id": "img-3",  "name": "nghttp2",      "version": "1.51.0",  "pkg_type": "deb", "license": "MIT",         "source_tool": "prisma"},
+            {"id": "pkg-11", "image_id": "img-3",  "name": "runc",         "version": "1.1.5",   "pkg_type": "rpm", "license": "Apache-2.0",  "source_tool": "prisma"},
+            {"id": "pkg-12", "image_id": "img-3",  "name": "python3.10",   "version": "3.10.12", "pkg_type": "deb", "license": "PSF",         "source_tool": "prisma"},
+            {"id": "pkg-13", "image_id": "img-3",  "name": "glibc",        "version": "2.35",    "pkg_type": "deb", "license": "LGPL-2.1",   "source_tool": "prisma"},
+            {"id": "pkg-14", "image_id": "img-4",  "name": "libwebp",      "version": "1.2.4",   "pkg_type": "deb", "license": "BSD-3",       "source_tool": "prisma"},
+            {"id": "pkg-15", "image_id": "img-4",  "name": "openssl",      "version": "1.1.1l",  "pkg_type": "deb", "license": "OpenSSL",     "source_tool": "prisma"},
+            {"id": "pkg-16", "image_id": "img-4",  "name": "busybox",      "version": "1.36.1",  "pkg_type": "apk", "license": "GPL-2.0",    "source_tool": "prisma"},
+            {"id": "pkg-17", "image_id": "img-5",  "name": "requests",     "version": "2.29.0",  "pkg_type": "pip", "license": "Apache-2.0",  "source_tool": "jfrog"},
+            {"id": "pkg-18", "image_id": "img-5",  "name": "sqlite3",      "version": "3.26.0",  "pkg_type": "deb", "license": "Public Dom.", "source_tool": "jfrog"},
+            {"id": "pkg-19", "image_id": "img-5",  "name": "python3.11",   "version": "3.11.4",  "pkg_type": "deb", "license": "PSF",         "source_tool": "jfrog"},
+            {"id": "pkg-20", "image_id": "img-6",  "name": "minizip",      "version": "1.2.11",  "pkg_type": "deb", "license": "zlib",        "source_tool": "prisma"},
+            {"id": "pkg-21", "image_id": "img-6",  "name": "glibc",        "version": "2.35",    "pkg_type": "deb", "license": "LGPL-2.1",   "source_tool": "prisma"},
+            {"id": "pkg-22", "image_id": "img-7",  "name": "xz-utils",     "version": "5.6.1",   "pkg_type": "deb", "license": "GPL-2.0",    "source_tool": "jfrog"},
+            {"id": "pkg-23", "image_id": "img-7",  "name": "libwebp",      "version": "1.2.4",   "pkg_type": "deb", "license": "BSD-3",       "source_tool": "jfrog"},
+            {"id": "pkg-24", "image_id": "img-7",  "name": "node",         "version": "20.0.0",  "pkg_type": "deb", "license": "MIT",         "source_tool": "jfrog"},
+            {"id": "pkg-25", "image_id": "img-8",  "name": "openssl",      "version": "3.0.6",   "pkg_type": "deb", "license": "Apache-2.0",  "source_tool": "prisma"},
+            {"id": "pkg-26", "image_id": "img-8",  "name": "minizip",      "version": "1.2.12",  "pkg_type": "deb", "license": "zlib",        "source_tool": "prisma"},
+            {"id": "pkg-27", "image_id": "img-9",  "name": "requests",     "version": "2.28.2",  "pkg_type": "pip", "license": "Apache-2.0",  "source_tool": "jfrog"},
+            {"id": "pkg-28", "image_id": "img-9",  "name": "python3.11",   "version": "3.11.4",  "pkg_type": "deb", "license": "PSF",         "source_tool": "jfrog"},
+            {"id": "pkg-29", "image_id": "img-10", "name": "log4j-core",   "version": "2.13.3",  "pkg_type": "jar", "license": "Apache-2.0",  "source_tool": "prisma"},
+            {"id": "pkg-30", "image_id": "img-10", "name": "libwebp",      "version": "1.3.0",   "pkg_type": "deb", "license": "BSD-3",       "source_tool": "prisma"},
+            {"id": "pkg-31", "image_id": "img-10", "name": "glibc",        "version": "2.35",    "pkg_type": "deb", "license": "LGPL-2.1",   "source_tool": "prisma"},
+            {"id": "pkg-32", "image_id": "img-11", "name": "sqlite3",      "version": "3.27.0",  "pkg_type": "deb", "license": "Public Dom.", "source_tool": "jfrog"},
+            {"id": "pkg-33", "image_id": "img-11", "name": "alpine-base",  "version": "3.18.0",  "pkg_type": "apk", "license": "MIT",         "source_tool": "jfrog"},
+            {"id": "pkg-34", "image_id": "img-12", "name": "curl",         "version": "8.0.1",   "pkg_type": "deb", "license": "MIT",         "source_tool": "prisma"},
+            {"id": "pkg-35", "image_id": "img-12", "name": "minizip",      "version": "1.2.12",  "pkg_type": "deb", "license": "zlib",        "source_tool": "prisma"},
+            {"id": "pkg-36", "image_id": "img-12", "name": "busybox",      "version": "1.36.1",  "pkg_type": "apk", "license": "GPL-2.0",    "source_tool": "prisma"},
+        ]
+        for d in PACKAGES:
+            db.add(ImagePackage(
+                id=d["id"], image_id=d["image_id"], name=d["name"],
+                version=d["version"], pkg_type=d["pkg_type"],
+                license=d["license"], source_tool=d["source_tool"],
+            ))
+
         print("Seeding sync jobs...")
         for d in SYNC_JOBS:
             db.add(SyncJob(
@@ -196,7 +250,8 @@ def seed():
 
         db.commit()
         print(f"Seeded: {len(IMAGES)} images, {len(VULNERABILITIES)} vulns, {len(FIX_SUGGESTIONS)} fixes, "
-              f"{len(CODE_PROJECTS)} projects, {len(CODE_ISSUES)} issues, {len(PIPELINE_RUNS)} pipelines, {len(SYNC_JOBS)} sync jobs")
+              f"{len(CODE_PROJECTS)} projects, {len(CODE_ISSUES)} issues, {len(PIPELINE_RUNS)} pipelines, "
+              f"{len(SYNC_JOBS)} sync jobs, {len(PACKAGES)} packages")
 
     except Exception as e:
         db.rollback()

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
 from app.models.code_project import CodeProject
 from app.models.code_issue import CodeIssue
-from app.schemas.code_quality import CodeProjectOut, CodeIssueOut
+from app.schemas.code_quality import CodeProjectOut, CodeIssueOut, RuleInfoOut
+from app.integrations import sonarqube
 
 router = APIRouter(prefix="/api", tags=["code-quality"])
 
@@ -29,3 +30,11 @@ def list_code_issues(
     if severity and severity != "all":
         query = query.filter(CodeIssue.severity == severity)
     return query.all()
+
+
+@router.get("/rules/{rule_id}", response_model=RuleInfoOut)
+async def get_rule_info(rule_id: str, db: Session = Depends(get_db)):
+    info = await sonarqube.fetch_rule_info(db, rule_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="Rule info not found")
+    return RuleInfoOut(**info)

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
-from app.routers import dashboard, images, vulnerabilities, code_quality, pipelines, search, fix_suggestions, sync
+from app.routers import dashboard, images, vulnerabilities, code_quality, pipelines, search, fix_suggestions, sync, integrations
 
 app = FastAPI(title="DevSecOps Portal API", version="1.0.0")
 
@@ -27,6 +27,7 @@ app.include_router(pipelines.router)
 app.include_router(search.router)
 app.include_router(fix_suggestions.router)
 app.include_router(sync.router)
+app.include_router(integrations.router)
 
 
 @app.get("/health")
