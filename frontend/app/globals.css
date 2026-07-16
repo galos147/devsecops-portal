@@ -1,0 +1,9 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: oklch(0.15 0.004 250); color: oklch(0.93 0.004 250); font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif; font-size: 14px; }
+a { color: oklch(0.72 0.14 245); text-decoration: none; }
+a:hover { text-decoration: underline; }
+select, input, button { font-family: inherit; }
+select { appearance: auto; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: oklch(0.30 0.008 250); border-radius: 6px; }
+::-webkit-scrollbar-track { background: transparent; }

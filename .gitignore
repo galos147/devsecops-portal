@@ -1,0 +1,16 @@
+# Secrets — never commit
+.env
+.env.jfrog
+k8s/secrets.yaml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Node
+node_modules/
+.next/
+
+# Docker volumes
+pgdata/

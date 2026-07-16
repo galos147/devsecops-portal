@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: devsecops
+      POSTGRES_PASSWORD: devsecops
+      POSTGRES_DB: devsecops
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devsecops"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://devsecops:devsecops@db:5432/devsecops
+      JFROG_URL: ""
+      JFROG_USERNAME: ""
+      JFROG_PASSWORD: ""
+      JFROG_REPO: "docker-local"
+      SONAR_URL: ""
+      SONAR_TOKEN: ""
+      PRISMA_URL: ""
+      PRISMA_ACCESS_KEY: ""
+      PRISMA_SECRET_KEY: ""
+      GITLAB_URL: ""
+      GITLAB_TOKEN: ""
+      SYNC_INTERVAL_MINUTES: "30"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      API_BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  pgdata:
