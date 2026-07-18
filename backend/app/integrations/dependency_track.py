@@ -148,6 +148,7 @@ async def sync(db: Session, job: SyncJob | None = None) -> dict:
                         existing_vuln.cvss_score = cvss
                         existing_vuln.description = vuln.get("description")
                         existing_vuln.status = status
+                        existing_vuln.installed_version = component.get("version")
                     db.commit()
 
             set_phase("projects", processed=i + 1)
