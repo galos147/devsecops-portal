@@ -45,7 +45,8 @@ SQLAlchemy's `index=True`) to support `ilike '%x%'` search at scale.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | String PK | |
-| `image_id` | FK → `images.id`, **indexed** | The single highest-value index added this session — every image-detail/vuln-count query filters on it, and it had no index at all originally |
+| `image_id` | FK → `images.id`, nullable, indexed | Nullable since the Dependency-Track integration — a row belongs to either an image or a `dependency_track_projects` row, never both, disambiguated by `source_tool` |
+| `dt_project_id` | FK → `dependency_track_projects.id`, nullable, indexed | Set only for Dependency-Track-sourced rows (`source_tool = "dependency_track"`) |
 | `cve_id` | String, indexed | |
 | `severity` | Enum (critical\|high\|medium\|low) | |
 | `package_name`, `installed_version`, `fixed_version`, `cvss_score`, `description`, `source_tool` | | |
@@ -54,6 +55,12 @@ SQLAlchemy's `index=True`) to support `ilike '%x%'` search at scale.
 
 Composite index `(image_id, status)` also exists, matching the exact
 `_vuln_counts()` query shape.
+
+### `dependency_track_projects`
+`id` PK (Dependency-Track's own project UUID), `name`, `version`,
+`last_synced_at`, `is_seed`. A row here is created automatically the first
+time a project's SBOM is uploaded to Dependency-Track (via GitLab CI) — the
+portal never registers these projects itself, only reads them back.
 
 ### `image_packages`
 `id` PK, `image_id` (FK, indexed), `name`, `version`, `pkg_type`, `license`, `source_tool`.

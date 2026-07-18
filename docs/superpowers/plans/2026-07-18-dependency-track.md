@@ -1109,7 +1109,7 @@ sbom-scan:
 ```
 (`allow_failure: true` — an SBOM upload failure shouldn't block the pipeline the way a real test failure would; this is additive observability, not a gate.)
 
-- [ ] **Step 2: Push and confirm the job runs**
+- [ ] **Step 3: Push and confirm the job runs**
 
 ```bash
 cd sample-projects/webhook-relay
@@ -1119,7 +1119,7 @@ git push
 ```
 Watch the pipeline in GitLab.com's UI — confirm the `sbom-scan` job runs and succeeds.
 
-- [ ] **Step 3: Verify in Dependency-Track directly**
+- [ ] **Step 4: Verify in Dependency-Track directly**
 
 Open `http://localhost:8081`, confirm a `webhook-relay` project now exists with a real `lastBomImport` timestamp and whatever real findings Trivy's SBOM of that actual repo's dependencies surfaces.
 
