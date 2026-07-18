@@ -13,6 +13,7 @@ class CodeProjectOut(BaseModel):
     coverage: float
     hotspots: int = 0
     sonar_url: Optional[str] = None
+    is_seed: bool = False
 
     class Config:
         from_attributes = True
@@ -30,6 +31,7 @@ class CodeIssueOut(BaseModel):
     line_number: Optional[int]
     status: Optional[str]
     effort: Optional[str]
+    is_seed: bool = False
 
     class Config:
         from_attributes = True

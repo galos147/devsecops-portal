@@ -7,6 +7,7 @@ from app.models.vulnerability import Vulnerability, Severity
 from app.models.code_issue import CodeIssue
 from app.models.pipeline_run import PipelineRun
 from app.models.sync_job import SyncJob
+from app.integrations import config_resolver
 from app.schemas.dashboard import DashboardStats, SeverityCount, ToolHealth, TopVulnImage, RecentFailure
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -50,12 +51,14 @@ def get_stats(db: Session = Depends(get_db)):
     tool_health = []
     for tool in ["jfrog", "sonarqube", "prisma", "gitlab"]:
         row = db.query(SyncJob).filter(SyncJob.tool == tool).order_by(SyncJob.finished_at.desc()).first()
+        connected = config_resolver.resolve(db, tool)["source"] != "none"
         tool_health.append(ToolHealth(
             tool=tool,
             label=TOOL_LABELS[tool],
             status=row.status if row else "unknown",
             last_sync=row.finished_at.isoformat() if row and row.finished_at else None,
             records_synced=row.records_synced or 0 if row else 0,
+            connected=connected,
         ))
 
     images = db.query(Image).all()
@@ -78,6 +81,7 @@ def get_stats(db: Session = Depends(get_db)):
             registry=image_map[img_id].registry,
             critical=counts["critical"],
             high=counts["high"],
+            is_seed=image_map[img_id].is_seed,
         )
         for img_id, counts in top_images
         if img_id in image_map
@@ -91,6 +95,7 @@ def get_stats(db: Session = Depends(get_db)):
             ref=p.ref or "",
             started_at=p.started_at.isoformat() if p.started_at else None,
             total_findings=p.sast + p.dep_scan + p.secret_detection,
+            is_seed=p.is_seed,
         )
         for p in failures
     ]

@@ -15,6 +15,7 @@ class ToolHealth(BaseModel):
     status: str
     last_sync: Optional[str]
     records_synced: int
+    connected: bool = False
 
 
 class TopVulnImage(BaseModel):
@@ -24,6 +25,7 @@ class TopVulnImage(BaseModel):
     registry: str
     critical: int
     high: int
+    is_seed: bool = False
 
 
 class RecentFailure(BaseModel):
@@ -32,6 +34,7 @@ class RecentFailure(BaseModel):
     ref: str
     started_at: Optional[str]
     total_findings: int
+    is_seed: bool = False
 
 
 class DashboardStats(BaseModel):

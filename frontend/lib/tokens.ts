@@ -45,6 +45,35 @@ export function sevStyle(sev: string): React.CSSProperties {
   };
 }
 
+export const demoBadgeStyle: React.CSSProperties = {
+  background: C.inset,
+  color: C.textMuted,
+  fontSize: 10,
+  padding: "2px 7px",
+  borderRadius: 5,
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  border: `1px solid ${C.border}`,
+  whiteSpace: "nowrap",
+};
+
+export function connectionPillStyle(kind: "connected" | "none"): React.CSSProperties {
+  const colors = {
+    "connected": { bg: "oklch(0.28 0.05 150)", fg: "oklch(0.72 0.12 150)" },
+    "none": { bg: C.inset, fg: C.textMuted },
+  }[kind];
+  return {
+    background: colors.bg,
+    color: colors.fg,
+    fontSize: 11,
+    padding: "3px 9px",
+    borderRadius: 20,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+  };
+}
+
 export function relTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const diff = Date.now() - new Date(iso).getTime();

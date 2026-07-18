@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Float
+from sqlalchemy import Column, String, Integer, Float, Boolean
 from app.database import Base
 
 
@@ -15,3 +15,4 @@ class CodeProject(Base):
     coverage = Column(Float, default=0.0)
     hotspots = Column(Integer, default=0)
     sonar_url = Column(String)
+    is_seed = Column(Boolean, nullable=False, default=False)

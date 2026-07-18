@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, JSON
+from sqlalchemy import Column, String, Integer, DateTime, JSON, Boolean
 from app.database import Base
 
 
@@ -16,3 +16,6 @@ class PipelineRun(Base):
     dep_scan = Column(Integer, default=0)
     secret_detection = Column(Integer, default=0)
     findings = Column(JSON, default=list)
+    web_url = Column(String)
+    failed_jobs = Column(JSON, default=list)  # [{stage, name, failure_reason}, ...]
+    is_seed = Column(Boolean, nullable=False, default=False)

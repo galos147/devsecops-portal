@@ -14,6 +14,40 @@ from app.models.pipeline_run import PipelineRun
 from app.models.fix_suggestion import FixSuggestion
 from app.models.sync_job import SyncJob
 from app.models.image_package import ImagePackage
+from app.models.service import Service
+from app.models.user import User
+from app.auth import hash_password
+import uuid
+
+DEFAULT_ADMIN_USERNAME = "admin"
+DEFAULT_ADMIN_PASSWORD = "ChangeMe123!"
+
+
+def bootstrap_admin(db) -> None:
+    """
+    Creates a default admin account only if zero users exist yet. Deliberate, visible
+    MVP trade-off for a small-team internal tool (not a public-facing product) — there's
+    no email infrastructure to deliver a real invite, so the default credential is
+    hardcoded and logged loudly. Must be changed on first login (Settings > Users).
+    """
+    if db.query(User).count() > 0:
+        return
+    admin = User(
+        id=f"user-{uuid.uuid4().hex[:12]}",
+        username=DEFAULT_ADMIN_USERNAME,
+        password_hash=hash_password(DEFAULT_ADMIN_PASSWORD),
+        role="admin",
+        is_active=True,
+        created_at=datetime.utcnow(),
+    )
+    db.add(admin)
+    db.commit()
+    print("=" * 72)
+    print("  BOOTSTRAP: no users existed — created a default admin account")
+    print(f"    username: {DEFAULT_ADMIN_USERNAME}")
+    print(f"    password: {DEFAULT_ADMIN_PASSWORD}")
+    print("  CHANGE THIS PASSWORD IMMEDIATELY: log in, then Settings > Users.")
+    print("=" * 72)
 
 
 def dt(s):
@@ -100,16 +134,27 @@ CODE_ISSUES = [
 ]
 
 PIPELINE_RUNS = [
-    {"id": "p-1", "gitlab_project_id": "4021", "project": "payments-service", "ref": "main", "status": "passed", "started_at": "2026-07-15T08:00:00", "finished_at": "2026-07-15T08:11:00", "sast": 1, "dep_scan": 2, "secret_detection": 0, "findings": [{"cat": "SAST", "text": "Potential SQL injection in PaymentProcessor.java:88"}, {"cat": "Dependency", "text": "log4j-core 2.14.1 — CVE-2021-44228 (critical)"}, {"cat": "Dependency", "text": "openssl 3.0.6 — CVE-2022-3602 (high)"}]},
-    {"id": "p-2", "gitlab_project_id": "4022", "project": "auth-gateway", "ref": "main", "status": "failed", "started_at": "2026-07-15T07:40:00", "finished_at": "2026-07-15T07:52:00", "sast": 4, "dep_scan": 3, "secret_detection": 1, "findings": [{"cat": "SAST", "text": "Hardcoded credential in tokenService.js:42"}, {"cat": "SAST", "text": "ReDoS vulnerability in validators.js:118"}, {"cat": "SAST", "text": "JWT not verified in jwtMiddleware.js:29"}, {"cat": "SAST", "text": "Prototype pollution risk in utils.js:55"}, {"cat": "Dependency", "text": "xz-utils 5.6.0 — CVE-2024-3094 (critical)"}, {"cat": "Dependency", "text": "curl 8.1.0 — CVE-2023-38545 (high)"}, {"cat": "Dependency", "text": "openssl 3.0.6 — CVE-2022-3602 (high)"}, {"cat": "Secrets", "text": "AWS access key found in .env.example"}]},
-    {"id": "p-3", "gitlab_project_id": "4023", "project": "checkout-api", "ref": "release/3.0", "status": "passed", "started_at": "2026-07-15T06:15:00", "finished_at": "2026-07-15T06:29:00", "sast": 0, "dep_scan": 1, "secret_detection": 0, "findings": [{"cat": "Dependency", "text": "nghttp2 1.51.0 — CVE-2023-44487 (high)"}]},
-    {"id": "p-4", "gitlab_project_id": "4024", "project": "notification-worker", "ref": "main", "status": "failed", "started_at": "2026-07-14T22:10:00", "finished_at": "2026-07-14T22:24:00", "sast": 2, "dep_scan": 1, "secret_detection": 1, "findings": [{"cat": "SAST", "text": "SSL verification disabled in http_client.py:15"}, {"cat": "SAST", "text": "Predictable temp file in email_sender.py:76"}, {"cat": "Dependency", "text": "libwebp 1.2.4 — CVE-2023-4863 (critical)"}, {"cat": "Secrets", "text": "SMTP password in config/prod.yaml"}]},
-    {"id": "p-5", "gitlab_project_id": "4025", "project": "user-profile-svc", "ref": "main", "status": "passed", "started_at": "2026-07-14T19:05:00", "finished_at": "2026-07-14T19:18:00", "sast": 0, "dep_scan": 0, "secret_detection": 0, "findings": []},
-    {"id": "p-6", "gitlab_project_id": "4026", "project": "inventory-sync", "ref": "feature/reconcile-v2", "status": "running", "started_at": "2026-07-15T09:02:00", "finished_at": None, "sast": 0, "dep_scan": 0, "secret_detection": 0, "findings": []},
-    {"id": "p-7", "gitlab_project_id": "4027", "project": "search-indexer", "ref": "main", "status": "failed", "started_at": "2026-07-14T16:30:00", "finished_at": "2026-07-14T16:50:00", "sast": 3, "dep_scan": 4, "secret_detection": 0, "findings": [{"cat": "SAST", "text": "Resource leak in EsClient.java:203"}, {"cat": "SAST", "text": "Unchecked null dereference in QueryBuilder.java:112"}, {"cat": "SAST", "text": "Deprecated API usage in LegacyMapper.java:9"}, {"cat": "Dependency", "text": "xz-utils 5.6.1 — CVE-2024-3094 (critical)"}, {"cat": "Dependency", "text": "curl 8.3.0 — CVE-2023-38545 (high)"}, {"cat": "Dependency", "text": "libwebp 1.3.0 — CVE-2023-4863 (critical)"}, {"cat": "Dependency", "text": "minizip 1.2.11 — CVE-2023-45853 (medium)"}]},
-    {"id": "p-8", "gitlab_project_id": "4028", "project": "billing-engine", "ref": "main", "status": "passed", "started_at": "2026-07-14T14:00:00", "finished_at": "2026-07-14T14:14:00", "sast": 1, "dep_scan": 0, "secret_detection": 0, "findings": [{"cat": "SAST", "text": "SQL injection risk in InvoiceDao.java:154"}]},
-    {"id": "p-9", "gitlab_project_id": "4029", "project": "email-dispatcher", "ref": "main", "status": "passed", "started_at": "2026-07-14T11:22:00", "finished_at": "2026-07-14T11:31:00", "sast": 0, "dep_scan": 1, "secret_detection": 0, "findings": [{"cat": "Dependency", "text": "requests 2.28.2 — CVE-2023-32681 (medium)"}]},
-    {"id": "p-10", "gitlab_project_id": "4030", "project": "fraud-detection", "ref": "main", "status": "failed", "started_at": "2026-07-13T20:05:00", "finished_at": "2026-07-13T20:19:00", "sast": 2, "dep_scan": 2, "secret_detection": 2, "findings": [{"cat": "SAST", "text": "Insecure deserialization in ModelLoader.java:67"}, {"cat": "SAST", "text": "Command injection risk in RuleEngine.java:201"}, {"cat": "Dependency", "text": "log4j-core 2.13.3 — CVE-2021-44228 (critical)"}, {"cat": "Dependency", "text": "libwebp 1.3.0 — CVE-2023-4863 (critical)"}, {"cat": "Secrets", "text": "Stripe API key in src/payments/config.js"}, {"cat": "Secrets", "text": "Database password in docker-compose.override.yml"}]},
+    {"id": "p-1", "gitlab_project_id": "4021", "project": "payments-service", "ref": "main", "status": "passed", "started_at": "2026-07-15T08:00:00", "finished_at": "2026-07-15T08:11:00", "sast": 1, "dep_scan": 2, "secret_detection": 0, "findings": [{"cat": "SAST", "text": "Potential SQL injection in PaymentProcessor.java:88"}, {"cat": "Dependency", "text": "log4j-core 2.14.1 — CVE-2021-44228 (critical)"}, {"cat": "Dependency", "text": "openssl 3.0.6 — CVE-2022-3602 (high)"}], "web_url": "https://gitlab.com/acme-corp/payments-service/-/pipelines/100231"},
+    {"id": "p-2", "gitlab_project_id": "4022", "project": "auth-gateway", "ref": "main", "status": "failed", "started_at": "2026-07-15T07:40:00", "finished_at": "2026-07-15T07:52:00", "sast": 4, "dep_scan": 3, "secret_detection": 1, "findings": [{"cat": "SAST", "text": "Hardcoded credential in tokenService.js:42"}, {"cat": "SAST", "text": "ReDoS vulnerability in validators.js:118"}, {"cat": "SAST", "text": "JWT not verified in jwtMiddleware.js:29"}, {"cat": "SAST", "text": "Prototype pollution risk in utils.js:55"}, {"cat": "Dependency", "text": "xz-utils 5.6.0 — CVE-2024-3094 (critical)"}, {"cat": "Dependency", "text": "curl 8.1.0 — CVE-2023-38545 (high)"}, {"cat": "Dependency", "text": "openssl 3.0.6 — CVE-2022-3602 (high)"}, {"cat": "Secrets", "text": "AWS access key found in .env.example"}], "web_url": "https://gitlab.com/acme-corp/auth-gateway/-/pipelines/100232", "failed_jobs": [{"stage": "test", "name": "sast", "failure_reason": "script_failure"}, {"stage": "test", "name": "secret_detection", "failure_reason": "script_failure"}]},
+    {"id": "p-3", "gitlab_project_id": "4023", "project": "checkout-api", "ref": "release/3.0", "status": "passed", "started_at": "2026-07-15T06:15:00", "finished_at": "2026-07-15T06:29:00", "sast": 0, "dep_scan": 1, "secret_detection": 0, "findings": [{"cat": "Dependency", "text": "nghttp2 1.51.0 — CVE-2023-44487 (high)"}], "web_url": "https://gitlab.com/acme-corp/checkout-api/-/pipelines/100233"},
+    {"id": "p-4", "gitlab_project_id": "4024", "project": "notification-worker", "ref": "main", "status": "failed", "started_at": "2026-07-14T22:10:00", "finished_at": "2026-07-14T22:24:00", "sast": 2, "dep_scan": 1, "secret_detection": 1, "findings": [{"cat": "SAST", "text": "SSL verification disabled in http_client.py:15"}, {"cat": "SAST", "text": "Predictable temp file in email_sender.py:76"}, {"cat": "Dependency", "text": "libwebp 1.2.4 — CVE-2023-4863 (critical)"}, {"cat": "Secrets", "text": "SMTP password in config/prod.yaml"}], "web_url": "https://gitlab.com/acme-corp/notification-worker/-/pipelines/100234", "failed_jobs": [{"stage": "test", "name": "sast", "failure_reason": "script_failure"}, {"stage": "test", "name": "secret_detection", "failure_reason": "script_failure"}]},
+    {"id": "p-5", "gitlab_project_id": "4025", "project": "user-profile-svc", "ref": "main", "status": "passed", "started_at": "2026-07-14T19:05:00", "finished_at": "2026-07-14T19:18:00", "sast": 0, "dep_scan": 0, "secret_detection": 0, "findings": [], "web_url": "https://gitlab.com/acme-corp/user-profile-svc/-/pipelines/100235"},
+    {"id": "p-6", "gitlab_project_id": "4026", "project": "inventory-sync", "ref": "feature/reconcile-v2", "status": "running", "started_at": "2026-07-15T09:02:00", "finished_at": None, "sast": 0, "dep_scan": 0, "secret_detection": 0, "findings": [], "web_url": "https://gitlab.com/acme-corp/inventory-sync/-/pipelines/100236"},
+    {"id": "p-7", "gitlab_project_id": "4027", "project": "search-indexer", "ref": "main", "status": "failed", "started_at": "2026-07-14T16:30:00", "finished_at": "2026-07-14T16:50:00", "sast": 3, "dep_scan": 4, "secret_detection": 0, "findings": [{"cat": "SAST", "text": "Resource leak in EsClient.java:203"}, {"cat": "SAST", "text": "Unchecked null dereference in QueryBuilder.java:112"}, {"cat": "SAST", "text": "Deprecated API usage in LegacyMapper.java:9"}, {"cat": "Dependency", "text": "xz-utils 5.6.1 — CVE-2024-3094 (critical)"}, {"cat": "Dependency", "text": "curl 8.3.0 — CVE-2023-38545 (high)"}, {"cat": "Dependency", "text": "libwebp 1.3.0 — CVE-2023-4863 (critical)"}, {"cat": "Dependency", "text": "minizip 1.2.11 — CVE-2023-45853 (medium)"}], "web_url": "https://gitlab.com/acme-corp/search-indexer/-/pipelines/100237", "failed_jobs": [{"stage": "test", "name": "sast", "failure_reason": "script_failure"}, {"stage": "test", "name": "dependency_scanning", "failure_reason": "script_failure"}]},
+    {"id": "p-8", "gitlab_project_id": "4028", "project": "billing-engine", "ref": "main", "status": "passed", "started_at": "2026-07-14T14:00:00", "finished_at": "2026-07-14T14:14:00", "sast": 1, "dep_scan": 0, "secret_detection": 0, "findings": [{"cat": "SAST", "text": "SQL injection risk in InvoiceDao.java:154"}], "web_url": "https://gitlab.com/acme-corp/billing-engine/-/pipelines/100238"},
+    {"id": "p-9", "gitlab_project_id": "4029", "project": "email-dispatcher", "ref": "main", "status": "passed", "started_at": "2026-07-14T11:22:00", "finished_at": "2026-07-14T11:31:00", "sast": 0, "dep_scan": 1, "secret_detection": 0, "findings": [{"cat": "Dependency", "text": "requests 2.28.2 — CVE-2023-32681 (medium)"}], "web_url": "https://gitlab.com/acme-corp/email-dispatcher/-/pipelines/100239"},
+    {"id": "p-10", "gitlab_project_id": "4030", "project": "fraud-detection", "ref": "main", "status": "failed", "started_at": "2026-07-13T20:05:00", "finished_at": "2026-07-13T20:19:00", "sast": 2, "dep_scan": 2, "secret_detection": 2, "findings": [{"cat": "SAST", "text": "Insecure deserialization in ModelLoader.java:67"}, {"cat": "SAST", "text": "Command injection risk in RuleEngine.java:201"}, {"cat": "Dependency", "text": "log4j-core 2.13.3 — CVE-2021-44228 (critical)"}, {"cat": "Dependency", "text": "libwebp 1.3.0 — CVE-2023-4863 (critical)"}, {"cat": "Secrets", "text": "Stripe API key in src/payments/config.js"}, {"cat": "Secrets", "text": "Database password in docker-compose.override.yml"}], "web_url": "https://gitlab.com/acme-corp/fraud-detection/-/pipelines/100240", "failed_jobs": [{"stage": "test", "name": "sast", "failure_reason": "script_failure"}, {"stage": "test", "name": "secret_detection", "failure_reason": "script_failure"}]},
+]
+
+SERVICES = [
+    {"id": "svc-1", "name": "payments-service", "image_name": "payments-service", "code_project_key": "payments-service", "pipeline_project": "payments-service"},
+    {"id": "svc-2", "name": "auth-gateway", "image_name": "auth-gateway", "code_project_key": "auth-gateway", "pipeline_project": "auth-gateway"},
+    {"id": "svc-3", "name": "checkout-api", "image_name": "checkout-api", "code_project_key": "checkout-api", "pipeline_project": "checkout-api"},
+    {"id": "svc-4", "name": "notification-worker", "image_name": "notification-worker", "code_project_key": "notification-worker", "pipeline_project": "notification-worker"},
+    {"id": "svc-5", "name": "user-profile-svc", "image_name": "user-profile-svc", "code_project_key": "user-profile-svc", "pipeline_project": "user-profile-svc"},
+    {"id": "svc-6", "name": "inventory-sync", "image_name": "inventory-sync", "code_project_key": "inventory-sync", "pipeline_project": "inventory-sync"},
+    {"id": "svc-7", "name": "search-indexer", "image_name": "search-indexer", "code_project_key": "search-indexer", "pipeline_project": "search-indexer"},
+    {"id": "svc-8", "name": "billing-engine", "image_name": "billing-engine", "code_project_key": "billing-engine", "pipeline_project": "billing-engine"},
 ]
 
 SYNC_JOBS = [
@@ -125,6 +170,9 @@ def seed():
     db = SessionLocal()
 
     try:
+        bootstrap_admin(db)  # unconditional, idempotent — must run even if demo data is
+                              # already seeded, so this sits before the early-return below
+
         has_images = db.query(Image).count() > 0
         has_packages = db.query(ImagePackage).count() > 0
 
@@ -141,7 +189,7 @@ def seed():
                 digest=d["digest"], size_mb=d["size_mb"],
                 pushed_at=datetime.fromisoformat(d["pushed_at"]),
                 last_scanned_at=datetime.fromisoformat(d["last_scanned_at"]),
-                source=d["source"],
+                source=d["source"], is_seed=True,
             ))
 
         print("Seeding vulnerabilities...")
@@ -151,7 +199,7 @@ def seed():
                 severity=d["severity"], package_name=d["package_name"],
                 installed_version=d["installed_version"], fixed_version=d["fixed_version"],
                 cvss_score=d["cvss_score"], description=d["description"],
-                source_tool=d["source_tool"], status=d["status"],
+                source_tool=d["source_tool"], status=d["status"], is_seed=True,
             ))
 
         print("Seeding fix suggestions...")
@@ -168,7 +216,7 @@ def seed():
                 id=d["id"], project_key=d["project_key"], name=d["name"],
                 quality_gate=d["quality_gate"], bugs=d["bugs"],
                 vulnerabilities=d["vulnerabilities"], code_smells=d["code_smells"],
-                coverage=d["coverage"],
+                coverage=d["coverage"], is_seed=True,
             ))
 
         print("Seeding code issues...")
@@ -177,7 +225,7 @@ def seed():
                 id=d["id"], project_key=d["project_key"], project_name=d["project_name"],
                 rule_id=d["rule_id"], type=d["type"], severity=d["severity"],
                 message=d["message"], file_path=d["file_path"],
-                line_number=d["line_number"], status=d["status"], effort=d["effort"],
+                line_number=d["line_number"], status=d["status"], effort=d["effort"], is_seed=True,
             ))
 
         print("Seeding pipeline runs...")
@@ -189,6 +237,7 @@ def seed():
                 finished_at=datetime.fromisoformat(d["finished_at"]) if d["finished_at"] else None,
                 sast=d["sast"], dep_scan=d["dep_scan"],
                 secret_detection=d["secret_detection"], findings=d["findings"],
+                web_url=d.get("web_url"), failed_jobs=d.get("failed_jobs", []), is_seed=True,
             ))
 
         print("Seeding image packages...")
@@ -248,10 +297,18 @@ def seed():
                 records_synced=d["records_synced"], error_message=d["error_message"],
             ))
 
+        print("Seeding services...")
+        for d in SERVICES:
+            db.add(Service(
+                id=d["id"], name=d["name"], image_name=d["image_name"],
+                code_project_key=d["code_project_key"], pipeline_project=d["pipeline_project"],
+                is_seed=True, created_at=datetime.utcnow(),
+            ))
+
         db.commit()
         print(f"Seeded: {len(IMAGES)} images, {len(VULNERABILITIES)} vulns, {len(FIX_SUGGESTIONS)} fixes, "
               f"{len(CODE_PROJECTS)} projects, {len(CODE_ISSUES)} issues, {len(PIPELINE_RUNS)} pipelines, "
-              f"{len(SYNC_JOBS)} sync jobs, {len(PACKAGES)} packages")
+              f"{len(SYNC_JOBS)} sync jobs, {len(PACKAGES)} packages, {len(SERVICES)} services")
 
     except Exception as e:
         db.rollback()

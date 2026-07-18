@@ -2,6 +2,7 @@
 import { useState, type KeyboardEvent } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { C } from "@/lib/tokens";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
@@ -17,6 +18,7 @@ export default function Topbar() {
   const router = useRouter();
   const path = usePathname();
   const [draft, setDraft] = useState("");
+  const { user, logout } = useAuth();
 
   const title = Object.entries(PAGE_TITLES).find(([k]) => k === "/" ? path === "/" : path.startsWith(k))?.[1] ?? "";
 
@@ -39,6 +41,10 @@ export default function Topbar() {
           placeholder="Search CVEs, images, projects…"
           style={{ background: "transparent", border: "none", outline: "none", color: C.text, fontSize: 13, flex: 1, fontFamily: "inherit" }}
         />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: 16 }}>
+        <span style={{ fontSize: 12.5, color: C.textSub }}>{user?.username}</span>
+        <span onClick={logout} style={{ cursor: "pointer", fontSize: 12.5, color: C.accentFg }}>Log out</span>
       </div>
     </div>
   );

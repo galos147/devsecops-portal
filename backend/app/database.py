@@ -2,7 +2,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.config import settings
 
-engine = create_engine(settings.database_url)
+engine = create_engine(
+    settings.database_url,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -19,5 +25,5 @@ def get_db():
 
 
 def init_db():
-    from app.models import image, vulnerability, code_project, code_issue, pipeline_run, fix_suggestion, sync_job, image_package, integration_config  # noqa
+    from app.models import image, vulnerability, code_project, code_issue, pipeline_run, fix_suggestion, sync_job, image_package, integration_config, service, user, session  # noqa
     Base.metadata.create_all(bind=engine)

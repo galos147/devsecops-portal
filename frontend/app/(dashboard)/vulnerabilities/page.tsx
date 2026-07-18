@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { api, type VulnGroupOut } from "@/lib/api";
 import { C } from "@/lib/tokens";
 import SeverityBadge from "@/components/SeverityBadge";
+import DemoBadge from "@/components/DemoBadge";
 
 const filterStyle = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "8px 10px", color: C.text, fontSize: 13 };
 
@@ -29,7 +30,7 @@ export default function VulnerabilitiesPage() {
 
   const filtered = vulns
     .filter(v => {
-      if (q && !`${v.cve_id} ${v.description} ${v.package_name ?? ""}`.toLowerCase().includes(q.toLowerCase())) return false;
+      if (q && !`${v.cve_id} ${v.description ?? ""}`.toLowerCase().includes(q.toLowerCase())) return false;
       if (severity !== "all" && v.severity !== severity) return false;
       if (status !== "all" && v.status !== status) return false;
       if (source !== "all" && v.source_tool !== source) return false;
@@ -77,7 +78,10 @@ export default function VulnerabilitiesPage() {
         </div>
         {filtered.map(v => (
           <div key={v.cve_id} onClick={() => router.push(`/vulnerabilities/${v.cve_id}`)} style={{ display: "grid", gridTemplateColumns: cols, padding: "12px 16px", borderBottom: `1px solid ${C.borderRow}`, cursor: "pointer", alignItems: "center" }}>
-            <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 12.5 }}>{v.cve_id}</div>
+            <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6 }}>
+              {v.cve_id}
+              {v.is_seed && <DemoBadge />}
+            </div>
             <SeverityBadge sev={v.severity} />
             <div style={{ fontSize: 12.5, fontFamily: "ui-monospace,monospace" }}>{v.cvss_score}</div>
             <div style={{ fontSize: 12.5, color: C.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.description}</div>

@@ -10,7 +10,7 @@ class IntegrationOut(BaseModel):
     username: Optional[str] = None
     secret_set: bool = False
     extra: Optional[str] = None
-    source: str  # "database" | "env" | "none"
+    source: str  # "database" | "none"
     updated_at: Optional[datetime] = None
 
 

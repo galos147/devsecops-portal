@@ -20,6 +20,7 @@ class ImageOut(BaseModel):
     last_scanned_at: Optional[datetime]
     source: str
     counts: VulnCount
+    is_seed: bool = False
 
     class Config:
         from_attributes = True

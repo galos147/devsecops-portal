@@ -1,0 +1,13 @@
+stages:
+  - validate
+
+sonar-validate:
+  stage: validate
+  image: sonarsource/sonar-scanner-cli:latest
+  variables:
+    SONAR_HOST_URL: "http://sonarqube:9000"
+    GIT_DEPTH: "0"
+  script:
+    - sonar-scanner
+  tags:
+    - local

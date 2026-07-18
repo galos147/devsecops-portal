@@ -6,11 +6,16 @@ Flow:
   2. For each project, fetch its quality gate status and core measures
   3. Fetch open issues (bugs, vulnerabilities, code smells) for the project
   4. Upsert code_projects and code_issues into the DB
+  5. If the project has a real DevOps Platform binding (api/alm_settings/get_binding
+     — set up via SonarQube's own GitLab ALM integration, not guessed by name),
+     auto-correlate a Service to the matching GitLab project
 """
 
-import html
-import re
+import bleach
+import uuid
+from datetime import datetime
 from typing import Optional
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
@@ -20,6 +25,7 @@ from app.config import settings
 from app.integrations import config_resolver
 from app.models.code_project import CodeProject
 from app.models.code_issue import CodeIssue
+from app.models.service import Service
 
 MEASURE_KEYS = "bugs,vulnerabilities,code_smells,coverage,security_hotspots"
 ISSUE_STATUSES = "OPEN,CONFIRMED,REOPENED"
@@ -31,19 +37,81 @@ def _api(base_url: str, path: str) -> str:
 
 
 def _public_base(cfg: dict) -> str:
-    if cfg["source"] == "database":
-        return cfg["url"].rstrip("/")
-    return (settings.sonar_public_url or settings.sonar_url).rstrip("/")
+    # SONAR_PUBLIC_URL is for exactly this: the URL a browser can reach, which
+    # may differ from cfg["url"] (e.g. the backend calls SonarQube over the
+    # Docker network as "http://sonarqube:9000", but a browser needs localhost).
+    if settings.sonar_public_url:
+        return settings.sonar_public_url.rstrip("/")
+    return cfg["url"].rstrip("/")
 
 
 def _dashboard_url(cfg: dict, project_key: str) -> str:
     return f"{_public_base(cfg)}/dashboard?id={project_key}"
 
 
-def _html_to_text(content: str) -> str:
-    text = re.sub(r"<[^>]+>", " ", content)
-    text = html.unescape(text)
-    return re.sub(r"\s+", " ", text).strip()
+# SonarQube rule descriptions legitimately contain links, code blocks, and lists (e.g. a
+# hardcoded-secret rule's noncompliant/compliant code examples) — stripping all tags to plain
+# text destroys that. Sanitize instead of strip, so the Fix panel can render real (safe) HTML.
+_ALLOWED_TAGS = [
+    "a", "b", "blockquote", "br", "code", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+    "i", "li", "ol", "p", "pre", "strong", "table", "tbody", "td", "th", "thead", "tr", "ul",
+]
+_ALLOWED_ATTRIBUTES = {"a": ["href", "title"]}
+_ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
+
+
+def _sanitize_html(content: str) -> str:
+    return bleach.clean(content, tags=_ALLOWED_TAGS, attributes=_ALLOWED_ATTRIBUTES, protocols=_ALLOWED_PROTOCOLS, strip=True)
+
+
+def _pipeline_project_from_binding(binding: dict) -> Optional[str]:
+    if binding.get("alm") != "gitlab":
+        return None
+    url = binding.get("repositoryUrl")
+    if not url:
+        return None
+    path = urlparse(url).path.strip("/")
+    return path or None
+
+
+async def _correlate_service(client: httpx.AsyncClient, base_url: str, project_key: str, project_name: str, db: Session) -> bool:
+    """
+    Reads the project's real DevOps Platform binding (set up in SonarQube's own
+    admin settings, pointing at an actual GitLab repository) and auto-creates or
+    fills in a Service for it. Never overwrites a field the user (or a prior
+    discovery) already set — only fills in what's currently empty.
+    """
+    resp = await client.get(_api(base_url, "alm_settings/get_binding"), params={"project": project_key})
+    if resp.status_code != 200:
+        return False
+
+    pipeline_project = _pipeline_project_from_binding(resp.json())
+    if not pipeline_project:
+        return False
+
+    existing = db.query(Service).filter(
+        (Service.code_project_key == project_key) | (Service.pipeline_project == pipeline_project)
+    ).first()
+
+    if existing:
+        changed = False
+        if not existing.code_project_key:
+            existing.code_project_key = project_key
+            changed = True
+        if not existing.pipeline_project:
+            existing.pipeline_project = pipeline_project
+            changed = True
+        if changed:
+            db.commit()
+        return changed
+
+    db.add(Service(
+        id=f"svc-{uuid.uuid4().hex[:12]}", name=project_name,
+        code_project_key=project_key, pipeline_project=pipeline_project,
+        is_seed=False, created_at=datetime.utcnow(),
+    ))
+    db.commit()
+    return True
 
 
 async def test_connection(url: str, username: str, secret: str) -> dict:
@@ -78,13 +146,16 @@ async def fetch_rule_info(db: Session, rule_id: str) -> Optional[dict]:
 
         problem_parts = [s["content"] for s in sections if s.get("key") in ("root_cause", "introduction")]
         fix_parts = [s["content"] for s in sections if s.get("key") == "how_to_fix"]
-
         parts = problem_parts + fix_parts
-        description = _html_to_text(" ".join(parts)) if parts else None
-        if not description and rule.get("htmlDesc"):
-            description = _html_to_text(rule["htmlDesc"])
-        if description and len(description) > 700:
-            description = description[:700].rsplit(" ", 1)[0] + "…"
+
+        # Modern SonarQube (confirmed on our own 26.7 instance) only ever returns
+        # descriptionSections — htmlDesc/mdDesc are checked as a fallback for older versions
+        # that don't have the section-based format at all.
+        raw_html = " ".join(parts) if parts else (rule.get("htmlDesc") or rule.get("mdDesc"))
+        description = _sanitize_html(raw_html) if raw_html else None
+        # No character-truncation — the Fix panel that renders this already scrolls
+        # (overflowY: auto), and truncating raw HTML by character count risks cutting
+        # mid-tag and leaving broken markup.
 
         return {
             "rule_id": rule_id,
@@ -96,7 +167,7 @@ async def fetch_rule_info(db: Session, rule_id: str) -> Optional[dict]:
         }
 
 
-async def sync(db: Session) -> dict:
+async def sync(db: Session, job=None) -> dict:
     cfg = config_resolver.resolve(db, "sonarqube")
     if cfg["source"] == "none":
         return {"records": 0, "note": "SonarQube not configured"}
@@ -160,6 +231,9 @@ async def sync(db: Session) -> dict:
 
             db.commit()
             records += 1
+
+            if await _correlate_service(client, base_url, project_key, project_name, db):
+                records += 1
 
             page = 1
             while True:

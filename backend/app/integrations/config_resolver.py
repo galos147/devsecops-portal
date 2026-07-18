@@ -1,40 +1,13 @@
 """
-Resolves the effective connection config for a tool: a saved IntegrationConfig
-row (from the Settings page) takes precedence, falling back to the static
-env-var Settings when no row is saved yet.
+Resolves the effective connection config for a tool: only a saved
+IntegrationConfig row (from the Settings page) counts as configured.
+There is no environment-variable fallback — a tool is either connected
+through the UI or it isn't, so add/remove always behaves predictably.
 """
 
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models.integration_config import IntegrationConfig
-
-ENV_DEFAULTS = {
-    "jfrog": lambda: {
-        "url": settings.jfrog_url,
-        "username": settings.jfrog_username,
-        "secret": settings.jfrog_password or settings.jfrog_api_key,
-        "extra": settings.jfrog_repo,
-    },
-    "sonarqube": lambda: {
-        "url": settings.sonar_url,
-        "username": "",
-        "secret": settings.sonar_token,
-        "extra": "",
-    },
-    "prisma": lambda: {
-        "url": settings.prisma_url,
-        "username": settings.prisma_access_key,
-        "secret": settings.prisma_secret_key,
-        "extra": "",
-    },
-    "gitlab": lambda: {
-        "url": settings.gitlab_url,
-        "username": "",
-        "secret": settings.gitlab_token,
-        "extra": "",
-    },
-}
 
 
 def resolve(db: Session, tool: str) -> dict:
@@ -48,10 +21,6 @@ def resolve(db: Session, tool: str) -> dict:
             "extra": row.extra or "",
             "source": "database",
         }
-
-    env = ENV_DEFAULTS.get(tool, lambda: {"url": "", "username": "", "secret": "", "extra": ""})()
-    if env["url"] and env["secret"]:
-        return {**env, "source": "env"}
 
     return {
         "url": (row.url if row else "") or "",

@@ -47,8 +47,10 @@ def list_vulnerabilities(
                 "status": v.status,
                 "source_tool": v.source_tool,
                 "count": 0,
+                "is_seed": True,
             }
         groups[v.cve_id]["count"] += 1
+        groups[v.cve_id]["is_seed"] = groups[v.cve_id]["is_seed"] and v.is_seed
 
     return [
         VulnGroupOut(
@@ -60,6 +62,7 @@ def list_vulnerabilities(
             fixed_version=g["fixed_version"],
             status=g["status"],
             source_tool=g["source_tool"],
+            is_seed=g["is_seed"],
         )
         for g in groups.values()
     ]

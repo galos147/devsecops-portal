@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     gitlab_url: str = ""
     gitlab_token: str = ""
     sync_interval_minutes: int = 30
+    cookie_secure: bool = False  # flip to true once TLS terminates in front of the ingress (none exists yet)
 
     class Config:
         env_file = ".env"

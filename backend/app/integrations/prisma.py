@@ -17,6 +17,6 @@ async def test_connection(url: str, username: str, secret: str) -> dict:
     return {"ok": False, "message": f"Prisma Cloud responded with {resp.status_code}"}
 
 
-async def sync(db=None) -> dict:
+async def sync(db=None, job=None) -> dict:
     """Stub — wire up Prisma Cloud API calls here."""
     return {"records": 0}

@@ -3,11 +3,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
 from fastapi import HTTPException
+import httpx
 from app.database import get_db
-from app.models.image import Image
+from app.models.image import Image, ImageSource
 from app.models.vulnerability import Vulnerability
 from app.models.image_package import ImagePackage
 from app.schemas.image import ImageOut, ImageDetailOut, VulnCount, VulnOut, PackageOut
+from app.integrations import jfrog, config_resolver
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
@@ -58,7 +60,7 @@ def list_images(
         results.append(ImageOut(
             id=img.id, name=img.name, tag=img.tag, registry=img.registry,
             digest=img.digest, size_mb=img.size_mb, last_scanned_at=img.last_scanned_at,
-            source=img.source, counts=counts,
+            source=img.source, counts=counts, is_seed=img.is_seed,
         ))
     return results
 
@@ -98,6 +100,32 @@ def get_image_packages(image_id: str, db: Session = Depends(get_db)):
     return results
 
 
+@router.post("/{image_id}/sync", response_model=ImageDetailOut)
+async def sync_image(image_id: str, db: Session = Depends(get_db)):
+    img = db.query(Image).filter(Image.id == image_id).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Image not found")
+    if img.source != ImageSource.jfrog:
+        raise HTTPException(status_code=400, detail="On-demand sync is only supported for JFrog-sourced images")
+
+    cfg = config_resolver.resolve(db, "jfrog")
+    if cfg["source"] == "none":
+        raise HTTPException(status_code=400, detail="JFrog is not configured — add a connection in Settings first")
+
+    try:
+        await jfrog.sync_one_image(db, cfg, img)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"JFrog Xray request failed: {e}")
+
+    vulns = db.query(Vulnerability).filter(Vulnerability.image_id == image_id).all()
+    return ImageDetailOut(
+        id=img.id, name=img.name, tag=img.tag, registry=img.registry,
+        digest=img.digest, size_mb=img.size_mb, last_scanned_at=img.last_scanned_at,
+        source=img.source, counts=_vuln_counts(db, image_id), is_seed=img.is_seed,
+        vulnerabilities=[VulnOut.model_validate(v) for v in vulns],
+    )
+
+
 @router.get("/{image_id}", response_model=ImageDetailOut)
 def get_image(image_id: str, db: Session = Depends(get_db)):
     img = db.query(Image).filter(Image.id == image_id).first()
@@ -110,6 +138,6 @@ def get_image(image_id: str, db: Session = Depends(get_db)):
     return ImageDetailOut(
         id=img.id, name=img.name, tag=img.tag, registry=img.registry,
         digest=img.digest, size_mb=img.size_mb, last_scanned_at=img.last_scanned_at,
-        source=img.source, counts=counts,
+        source=img.source, counts=counts, is_seed=img.is_seed,
         vulnerabilities=[VulnOut.model_validate(v) for v in vulns],
     )

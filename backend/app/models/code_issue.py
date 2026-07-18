@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer
+from sqlalchemy import Column, String, Integer, Boolean
 from app.database import Base
 
 
@@ -16,3 +16,4 @@ class CodeIssue(Base):
     line_number = Column(Integer)
     status = Column(String, default="OPEN")
     effort = Column(String)
+    is_seed = Column(Boolean, nullable=False, default=False)

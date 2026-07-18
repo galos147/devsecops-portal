@@ -7,3 +7,21 @@ select { appearance: auto; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: oklch(0.30 0.008 250); border-radius: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
+.settings-add-tile:hover { border-color: oklch(0.66 0.15 245 / 0.5); color: oklch(0.93 0.004 250); }
+.settings-picker-tile:hover { border-color: oklch(0.66 0.15 245 / 0.5); background: oklch(0.19 0.006 250); }
+
+/* Renders server-sanitized (bleach) HTML from FixPanel's descriptionHtml — e.g. a SonarQube
+   rule's description with real code examples/links/lists. Only place in the app that renders
+   dynamically-injected markup, so it needs its own descendant rules; everywhere else uses
+   inline styles per convention. */
+.rule-html { font-size: 13px; color: oklch(0.65 0.01 250); line-height: 1.55; margin-bottom: 14px; }
+.rule-html p { margin-bottom: 10px; }
+.rule-html h3, .rule-html h4, .rule-html h5, .rule-html h6 { font-size: 12.5px; font-weight: 600; color: oklch(0.93 0.004 250); margin: 14px 0 6px; }
+.rule-html ul, .rule-html ol { padding-left: 20px; margin-bottom: 10px; }
+.rule-html li { margin-bottom: 4px; }
+.rule-html pre { background: oklch(0.14 0.004 250); border: 1px solid oklch(0.28 0.008 250); border-radius: 7px; padding: 10px 12px; margin-bottom: 10px; overflow-x: auto; font-family: ui-monospace, monospace; font-size: 11.5px; line-height: 1.5; }
+.rule-html code { font-family: ui-monospace, monospace; font-size: 11.5px; background: oklch(0.14 0.004 250); padding: 1px 5px; border-radius: 4px; }
+.rule-html pre code { background: none; padding: 0; }
+.rule-html blockquote { border-left: 2px solid oklch(0.28 0.008 250); padding-left: 10px; color: oklch(0.52 0.01 250); margin-bottom: 10px; }
+.rule-html table { border-collapse: collapse; margin-bottom: 10px; }
+.rule-html th, .rule-html td { border: 1px solid oklch(0.28 0.008 250); padding: 5px 8px; text-align: left; }

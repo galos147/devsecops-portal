@@ -1,46 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, type CodeProjectOut, type CodeIssueOut } from "@/lib/api";
-import { C, SEV, sevStyle, relTime } from "@/lib/tokens";
+import { C, SEV, sevStyle } from "@/lib/tokens";
 import FixPanel, { type FixPanelData } from "@/components/FixPanel";
-
-// --- Enriched project metadata ---
-interface ProjectMeta {
-  languages: string[];
-  lines: number;
-  duplication: number;
-  last_analysed: string;
-  sonar_url: string;
-}
-
-const LANG_COLORS: Record<string, { bg: string; fg: string }> = {
-  Python:     { bg: "oklch(0.22 0.06 245)", fg: "oklch(0.72 0.14 245)" },
-  Java:       { bg: "oklch(0.24 0.07 55)",  fg: "oklch(0.82 0.15 55)" },
-  JavaScript: { bg: "oklch(0.26 0.07 95)",  fg: "oklch(0.88 0.16 95)" },
-  TypeScript: { bg: "oklch(0.22 0.06 230)", fg: "oklch(0.68 0.13 230)" },
-  Go:         { bg: "oklch(0.22 0.06 210)", fg: "oklch(0.72 0.13 210)" },
-  Ruby:       { bg: "oklch(0.24 0.07 25)",  fg: "oklch(0.78 0.15 25)" },
-};
-
-const PROJECT_META: Record<string, ProjectMeta> = {
-  "payments-service":   { languages: ["Python", "Java"],       lines: 14200, duplication: 0.8, last_analysed: "2026-07-16T07:30:00", sonar_url: "https://sonar.corp/dashboard?id=payments-service" },
-  "auth-gateway":       { languages: ["JavaScript"],           lines: 12450, duplication: 3.2, last_analysed: "2026-07-16T07:40:00", sonar_url: "https://sonar.corp/dashboard?id=auth-gateway" },
-  "checkout-api":       { languages: ["Python"],               lines: 9800,  duplication: 1.1, last_analysed: "2026-07-16T06:15:00", sonar_url: "https://sonar.corp/dashboard?id=checkout-api" },
-  "notification-worker":{ languages: ["Python"],               lines: 7300,  duplication: 2.4, last_analysed: "2026-07-15T22:10:00", sonar_url: "https://sonar.corp/dashboard?id=notification-worker" },
-  "user-profile-svc":   { languages: ["Go", "Python"],         lines: 11600, duplication: 0.5, last_analysed: "2026-07-15T19:05:00", sonar_url: "https://sonar.corp/dashboard?id=user-profile-svc" },
-  "inventory-sync":     { languages: ["Go"],                   lines: 8900,  duplication: 1.7, last_analysed: "2026-07-15T18:00:00", sonar_url: "https://sonar.corp/dashboard?id=inventory-sync" },
-  "search-indexer":     { languages: ["Java"],                 lines: 22100, duplication: 4.8, last_analysed: "2026-07-14T16:30:00", sonar_url: "https://sonar.corp/dashboard?id=search-indexer" },
-  "billing-engine":     { languages: ["Java", "Python"],       lines: 17400, duplication: 2.1, last_analysed: "2026-07-14T14:00:00", sonar_url: "https://sonar.corp/dashboard?id=billing-engine" },
-};
+import DemoBadge from "@/components/DemoBadge";
 
 const filterStyle = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "8px 10px", color: C.text, fontSize: 13 };
-
-function LangBadge({ lang }: { lang: string }) {
-  const col = LANG_COLORS[lang] ?? { bg: C.card, fg: C.textSub };
-  return (
-    <span style={{ background: col.bg, color: col.fg, fontSize: 11, padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>{lang}</span>
-  );
-}
 
 function MetricTile({ label, value, danger, href }: { label: string; value: number | string; danger?: boolean; href?: string }) {
   const content = (
@@ -65,8 +30,7 @@ function MetricTile({ label, value, danger, href }: { label: string; value: numb
 }
 
 function ProjectCard({ p }: { p: CodeProjectOut }) {
-  const meta = PROJECT_META[p.project_key];
-  const sonarUrl = p.sonar_url ?? meta?.sonar_url;
+  const sonarUrl = p.sonar_url;
   const sonarBase = sonarUrl?.split("/dashboard?id=")[0];
   const issuesUrl = (type: string) => sonarBase ? `${sonarBase}/project/issues?id=${p.project_key}&resolved=false&types=${type}` : undefined;
   const hotspotsUrl = sonarBase ? `${sonarBase}/security_hotspots?id=${p.project_key}` : undefined;
@@ -77,7 +41,10 @@ function ProjectCard({ p }: { p: CodeProjectOut }) {
       {/* Header */}
       <div style={{ padding: "16px 18px 12px", borderBottom: `1px solid ${C.borderLight}` }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
-          <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 15, fontWeight: 700 }}>{p.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 15, fontWeight: 700 }}>{p.name}</div>
+            {p.is_seed && <DemoBadge />}
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <span style={{
               background: passed ? SEV.pass.bg : SEV.fail.bg,
@@ -91,16 +58,6 @@ function ProjectCard({ p }: { p: CodeProjectOut }) {
             )}
           </div>
         </div>
-
-        {meta && (
-          <>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center", marginBottom: 6 }}>
-              {meta.languages.map(l => <LangBadge key={l} lang={l} />)}
-              <span style={{ fontSize: 12, color: C.textMuted }}>· {meta.lines.toLocaleString()} lines</span>
-            </div>
-            <div style={{ fontSize: 11.5, color: C.textMuted }}>Last analysed {relTime(meta.last_analysed)}</div>
-          </>
-        )}
       </div>
 
       {/* Metric tiles */}
@@ -118,17 +75,14 @@ function ProjectCard({ p }: { p: CodeProjectOut }) {
       </div>
 
       {/* Footer */}
-      {meta && (
-        <div style={{ padding: "10px 18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 11.5, color: C.textMuted, whiteSpace: "nowrap" }}>Duplication {meta.duplication}%</span>
-            <div style={{ flex: 1, height: 5, background: "oklch(0.24 0.008 250)", borderRadius: 3, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${p.coverage}%`, background: p.coverage >= 80 ? "oklch(0.65 0.13 150)" : p.coverage >= 60 ? "oklch(0.75 0.13 95)" : "oklch(0.72 0.15 25)", borderRadius: 3 }} />
-            </div>
-            <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>{p.coverage}% covered</span>
+      <div style={{ padding: "10px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1, height: 5, background: "oklch(0.24 0.008 250)", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${p.coverage}%`, background: p.coverage >= 80 ? "oklch(0.65 0.13 150)" : p.coverage >= 60 ? "oklch(0.75 0.13 95)" : "oklch(0.72 0.15 25)", borderRadius: 3 }} />
           </div>
+          <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>{p.coverage}% covered</span>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -167,7 +121,7 @@ export default function CodeQualityPage() {
     api.ruleInfo(issue.rule_id).then(info => {
       setFixPanel(prev => prev ? {
         ...prev,
-        suggestion: info.description,
+        descriptionHtml: info.description,
         advisoryUrl: info.rule_url,
         advisoryLabel: "View Rule ↗",
       } : null);
@@ -181,10 +135,8 @@ export default function CodeQualityPage() {
   });
   const TH = { fontSize: 11, color: C.textMuted, textTransform: "uppercase" as const, letterSpacing: "0.03em" };
 
-  // Selected project meta for context strip
-  const selectedMeta = projectFilter !== "all" ? PROJECT_META[projectFilter] : null;
   const selectedProject = projects.find(p => p.project_key === projectFilter);
-  const selectedSonarUrl = selectedProject?.sonar_url ?? selectedMeta?.sonar_url;
+  const selectedSonarUrl = selectedProject?.sonar_url;
 
   return (
     <div>
@@ -203,7 +155,7 @@ export default function CodeQualityPage() {
       {tab === "issues" && (
         <div>
           {/* Filters */}
-          <div style={{ display: "flex", gap: 10, marginBottom: selectedMeta ? 12 : 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
             <select value={projectFilter} onChange={e => setProjectFilter(e.target.value)} style={filterStyle}>
               <option value="all">All projects</option>
               {projectKeys.map(k => <option key={k} value={k}>{k}</option>)}
@@ -223,19 +175,12 @@ export default function CodeQualityPage() {
           {selectedProject && (
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ fontFamily: "ui-monospace,monospace", fontSize: 13, fontWeight: 600 }}>{selectedProject.name}</span>
-              {selectedMeta && (
-                <div style={{ display: "flex", gap: 5 }}>
-                  {selectedMeta.languages.map(l => <LangBadge key={l} lang={l} />)}
-                </div>
-              )}
+              {selectedProject.is_seed && <DemoBadge />}
               <span style={{
                 background: selectedProject.quality_gate === "passed" ? SEV.pass.bg : SEV.fail.bg,
                 color: selectedProject.quality_gate === "passed" ? SEV.pass.fg : SEV.fail.fg,
                 fontSize: 11, padding: "2px 8px", borderRadius: 4, fontWeight: 700,
               }}>{selectedProject.quality_gate?.toUpperCase()}</span>
-              {selectedMeta && (
-                <span style={{ fontSize: 12, color: C.textMuted }}>· {selectedMeta.lines.toLocaleString()} lines</span>
-              )}
               {selectedSonarUrl && (
                 <div style={{ marginLeft: "auto" }}>
                   <a href={selectedSonarUrl} target="_blank" rel="noreferrer"
@@ -247,19 +192,20 @@ export default function CodeQualityPage() {
 
           {/* Issues table */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.8fr 0.5fr 0.9fr 0.8fr 0.6fr", padding: "10px 16px", borderBottom: `1px solid ${C.borderLight}` }}>
-              {["File", "Message", "Line", "Severity", "Effort", ""].map(h => <div key={h} style={TH}>{h}</div>)}
+            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.8fr 0.5fr 0.9fr 0.8fr 0.5fr 0.6fr", padding: "10px 16px", borderBottom: `1px solid ${C.borderLight}` }}>
+              {["File", "Message", "Line", "Severity", "Effort", "", ""].map((h, idx) => <div key={idx} style={TH}>{h}</div>)}
             </div>
             {filtered.length === 0 && (
               <div style={{ padding: 24, textAlign: "center", color: C.textMuted, fontSize: 13 }}>No issues match the current filters.</div>
             )}
             {filtered.map(i => (
-              <div key={i.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1.8fr 0.5fr 0.9fr 0.8fr 0.6fr", padding: "11px 16px", borderBottom: `1px solid ${C.borderRow}`, alignItems: "center" }}>
+              <div key={i.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1.8fr 0.5fr 0.9fr 0.8fr 0.5fr 0.6fr", padding: "11px 16px", borderBottom: `1px solid ${C.borderRow}`, alignItems: "center" }}>
                 <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 12, color: C.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{i.file_path}</div>
                 <div style={{ fontSize: 12.5 }}>{i.message}</div>
                 <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: C.textMuted }}>{i.line_number}</div>
                 <span style={sevStyle(i.severity ?? "info")}>{i.severity}</span>
                 <div style={{ fontSize: 12, color: C.textMuted }}>{i.effort}</div>
+                <div>{i.is_seed && <DemoBadge />}</div>
                 <button onClick={() => openFix(i)} style={{ background: C.accentBg, color: C.accentFg, border: `1px solid ${C.accentBorder}`, borderRadius: 6, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>Fix</button>
               </div>
             ))}

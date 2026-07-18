@@ -12,6 +12,11 @@ export interface FixPanelData {
   copyCmd?: string;
   advisoryUrl?: string;
   advisoryLabel?: string;
+  /** Sanitized (bleach-cleaned server-side) HTML — e.g. a SonarQube rule's description,
+   * with real links/code examples/lists — never raw untrusted content. Rendered via
+   * dangerouslySetInnerHTML, styled by the .rule-html rules in globals.css since inline
+   * style can't reach dynamically-injected child elements. */
+  descriptionHtml?: string;
 }
 
 interface Props {
@@ -46,7 +51,11 @@ export default function FixPanel({ data, onClose }: Props) {
         {data.cvssLine && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{data.cvssLine}</div>}
         {data.packageLine && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 14 }}>{data.packageLine}</div>}
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Remediation</div>
-        <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.5, marginBottom: 14 }}>{data.suggestion ?? "Upgrade to the fixed version listed above."}</div>
+        {data.descriptionHtml ? (
+          <div className="rule-html" dangerouslySetInnerHTML={{ __html: data.descriptionHtml }} />
+        ) : (
+          <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.5, marginBottom: 14 }}>{data.suggestion ?? "Upgrade to the fixed version listed above."}</div>
+        )}
         {data.copyCmd && (
           <div style={{ background: C.inset, border: `1px solid ${C.border}`, borderRadius: 7, padding: "10px 12px", fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "oklch(0.75 0.14 150)", marginBottom: 10, wordBreak: "break-all" }}>
             {data.copyCmd}

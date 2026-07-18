@@ -21,11 +21,19 @@ docker compose up -d
 - Postgres: `localhost:5432` (user/pass/db: `devsecops`)
 
 Load the demo data (fake images, CVEs, code issues, pipeline runs — everything
-you see on first load):
+you see on first load) — **this step is now required, not optional**: the
+portal requires a login, and this same script creates the first admin
+account if none exists yet.
 
 ```bash
 docker compose exec backend python seed.py
 ```
+
+Log in with `admin` / `ChangeMe123!` (printed to the console when created)
+and **change it immediately** via Settings → Users — this default credential
+is a deliberate MVP trade-off for a small-team internal tool with no email
+infrastructure to deliver a real invite any other way (see
+`docs/integrations.md` §11).
 
 No `.env` file is required to start — every env var in `docker-compose.yml`
 has a safe empty default.
@@ -33,16 +41,25 @@ has a safe empty default.
 ## Connect a real tool
 
 No config files to edit, no restarts required. Open **Settings**
-(`/settings`) and, per tool, fill in the URL and credentials, click
-**Test Connection**, then **Save**. Currently:
+(`/settings`) — connected tools show as a card; click **+ Add Integration**
+to pick an unconfigured tool, fill in the URL and credentials, **Test
+Connection**, then **Save**. Currently:
 
-- **JFrog Xray** and **SonarQube** — fully wired: Save + Sync Now pulls real
-  images/CVEs or projects/issues into the dashboard.
-- **Prisma Cloud** and **GitLab** — connection testing works; data sync is
-  still a stub (see `docs/integrations.md`).
+- **JFrog Xray**, **SonarQube**, and **GitLab** — fully wired: Save + Sync
+  Now pulls real images/CVEs, projects/issues, or pipeline runs into the
+  dashboard.
+- **Prisma Cloud** — connection testing works; data sync is still a stub
+  (see `docs/integrations.md`).
+
+Rows/cards from the bundled seed data are marked with a muted **Demo**
+badge so it's always clear what's real vs. fixture data. Disconnecting a
+tool (**Unregister**, in its card's Danger Zone) only clears the saved
+connection — previously-synced data stays until separately removed via
+**Delete synced data**.
 
 For standing up a local SonarQube instance to test against (including a small
-deliberately-flawed sample project to scan), see `docs/integrations.md`.
+deliberately-flawed sample project to scan) and a real GitLab.com + local
+CI runner setup, see `docs/integrations.md`.
 
 ## Stack
 

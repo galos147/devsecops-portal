@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type ImageOut } from "@/lib/api";
 import { C, sevStyle, relTime } from "@/lib/tokens";
+import DemoBadge from "@/components/DemoBadge";
 
 // ── shared styles ─────────────────────────────────────────────────────────────
 const filterStyle = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "8px 10px", color: C.text, fontSize: 13 };
@@ -152,7 +153,10 @@ export default function ImagesPage() {
             </div>
             {filteredImages.map(img => (
               <div key={img.id} onClick={() => router.push(`/images/${img.id}`)} style={{ display: "grid", gridTemplateColumns: imgCols, padding: "12px 16px", borderBottom: `1px solid ${C.borderRow}`, cursor: "pointer", alignItems: "center" }}>
-                <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 12.5 }}>{img.name}:{img.tag}</div>
+                <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 12.5, display: "flex", alignItems: "center", gap: 6 }}>
+                  {img.name}:{img.tag}
+                  {img.is_seed && <DemoBadge />}
+                </div>
                 <div style={{ fontSize: 12, color: C.textSub }}>{img.registry}</div>
                 <div style={countColor(img.counts.critical, "critical")}>{img.counts.critical}</div>
                 <div style={countColor(img.counts.high, "high")}>{img.counts.high}</div>

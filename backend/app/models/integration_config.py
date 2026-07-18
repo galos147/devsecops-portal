@@ -12,3 +12,4 @@ class IntegrationConfig(Base):
     secret = Column(String)  # plaintext; never echoed back over the API
     extra = Column(String)   # tool-specific extra (e.g. JFrog repo name)
     updated_at = Column(DateTime)
+    last_synced_at = Column(DateTime, nullable=True)  # watermark for incremental sync; NULL = never synced (full pull)

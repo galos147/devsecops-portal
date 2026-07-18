@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, type PipelineOut } from "@/lib/api";
-import { C, SEV, relTime } from "@/lib/tokens";
+import { C, sevStyle, relTime } from "@/lib/tokens";
+import DemoBadge from "@/components/DemoBadge";
+import PipelineDetailPanel from "@/components/PipelineDetailPanel";
 
 const filterStyle = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "8px 10px", color: C.text, fontSize: 13 };
 
@@ -9,7 +11,7 @@ export default function PipelinesPage() {
   const [pipelines, setPipelines] = useState<PipelineOut[]>([]);
   const [projectFilter, setProjectFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [selected, setSelected] = useState<PipelineOut | null>(null);
 
   useEffect(() => { api.pipelines().then(setPipelines); }, []);
 
@@ -43,31 +45,24 @@ export default function PipelinesPage() {
         </div>
         {filtered.map(p => {
           const status = p.status ?? "unknown";
-          const s = SEV[status] ?? { bg: C.card, fg: C.textSub };
           return (
-            <div key={p.id}>
-              <div onClick={() => setExpanded(expanded === p.id ? null : p.id)} style={{ display: "grid", gridTemplateColumns: cols, padding: "11px 16px", borderBottom: `1px solid ${C.borderRow}`, cursor: "pointer", alignItems: "center" }}>
-                <div style={{ fontSize: 12.5 }}>{p.project}</div>
-                <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: C.textSub }}>{p.ref}</div>
-                <span style={{ background: s.bg, color: s.fg, fontSize: 11, padding: "3px 8px", borderRadius: 5, fontWeight: 600, textTransform: "capitalize", width: "fit-content" }}>{status}</span>
-                <div style={{ fontSize: 12.5 }}>{p.sast}</div>
-                <div style={{ fontSize: 12.5 }}>{p.dep_scan}</div>
-                <div style={{ fontSize: 12.5 }}>{p.secret_detection}</div>
-                <div style={{ fontSize: 12, color: C.textMuted }}>{relTime(p.started_at)}</div>
+            <div key={p.id} onClick={() => setSelected(p)} style={{ display: "grid", gridTemplateColumns: cols, padding: "11px 16px", borderBottom: `1px solid ${C.borderRow}`, cursor: "pointer", alignItems: "center" }}>
+              <div style={{ fontSize: 12.5, display: "flex", alignItems: "center", gap: 6 }}>
+                {p.project}
+                {p.is_seed && <DemoBadge />}
               </div>
-              {expanded === p.id && p.findings && p.findings.length > 0 && (
-                <div style={{ background: "oklch(0.16 0.004 250)", padding: "10px 16px 12px", borderBottom: `1px solid ${C.borderRow}` }}>
-                  {p.findings.map((f, i) => (
-                    <div key={i} style={{ fontSize: 12, color: C.textSub, padding: "4px 0" }}>
-                      <span style={{ color: C.textMuted }}>{f.cat} — </span>{f.text}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: C.textSub }}>{p.ref}</div>
+              <span style={{ ...sevStyle(status), width: "fit-content" }}>{status}</span>
+              <div style={{ fontSize: 12.5 }}>{p.sast}</div>
+              <div style={{ fontSize: 12.5 }}>{p.dep_scan}</div>
+              <div style={{ fontSize: 12.5 }}>{p.secret_detection}</div>
+              <div style={{ fontSize: 12, color: C.textMuted }}>{relTime(p.started_at)}</div>
             </div>
           );
         })}
       </div>
+
+      <PipelineDetailPanel pipeline={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

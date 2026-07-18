@@ -4,6 +4,7 @@ import { api, type DashboardStats } from "@/lib/api";
 import { C, SEV, relTime } from "@/lib/tokens";
 import KpiCard from "@/components/KpiCard";
 import ToolHealthCard from "@/components/ToolHealthCard";
+import DemoBadge from "@/components/DemoBadge";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -62,7 +63,10 @@ export default function DashboardPage() {
           {stats.top_vuln_images.map(img => (
             <Link key={img.id} href={`/images/${img.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: `1px solid ${C.borderRow}`, textDecoration: "none", color: "inherit" }}>
               <div>
-                <div style={{ fontSize: 13, fontFamily: "ui-monospace,monospace" }}>{img.name}:{img.tag}</div>
+                <div style={{ fontSize: 13, fontFamily: "ui-monospace,monospace", display: "flex", alignItems: "center", gap: 6 }}>
+                  {img.name}:{img.tag}
+                  {img.is_seed && <DemoBadge />}
+                </div>
                 <div style={{ fontSize: 11, color: C.textMuted }}>{img.registry}</div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
@@ -78,7 +82,10 @@ export default function DashboardPage() {
           {stats.recent_failures.map(p => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: `1px solid ${C.borderRow}` }}>
               <div>
-                <div style={{ fontSize: 13 }}>{p.project} <span style={{ color: C.textMuted, fontSize: 11 }}>· {p.ref}</span></div>
+                <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                  {p.project} <span style={{ color: C.textMuted, fontSize: 11 }}>· {p.ref}</span>
+                  {p.is_seed && <DemoBadge />}
+                </div>
                 <div style={{ fontSize: 11, color: C.textMuted }}>{relTime(p.started_at)}</div>
               </div>
               <div style={{ fontSize: 11, color: "oklch(0.75 0.16 25)", fontFamily: "ui-monospace,monospace" }}>{p.total_findings} findings</div>

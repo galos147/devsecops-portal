@@ -44,12 +44,18 @@ export default function ImageDetailPage() {
   const [tab, setTab] = useState<Tab>("vulns");
   const [fixPanel, setFixPanel] = useState<FixPanelData | null>(null);
   const [pkgSearch, setPkgSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     api.image(id).then(setImg);
     api.imagePackages(id).then(setPackages).catch(() => {});
   }, [id]);
   if (!img) return <div style={{ color: C.textMuted, padding: 40 }}>Loading…</div>;
+
+  function handleSync() {
+    setSyncing(true);
+    api.syncImage(id).then(setImg).finally(() => setSyncing(false));
+  }
 
   const filteredPkgs = packages.filter(p => p.name.toLowerCase().includes(pkgSearch.toLowerCase()));
 
@@ -78,7 +84,14 @@ export default function ImageDetailPage() {
       <span onClick={() => router.push("/images")} style={{ cursor: "pointer", fontSize: 12.5, color: C.textSub }}>← Back to Images</span>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "10px 0 6px" }}>
         <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "ui-monospace,monospace" }}>{img.name}:{img.tag}</div>
-        <div style={{ fontSize: 11, color: C.textMuted, textTransform: "capitalize" }}>via {img.source}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 11, color: C.textMuted, textTransform: "capitalize" }}>via {img.source}</div>
+          {img.source === "jfrog" && (
+            <button onClick={handleSync} disabled={syncing} style={{ background: C.accentBg, color: C.accentFg, border: `1px solid ${C.accentBorder}`, borderRadius: 6, padding: "5px 10px", fontSize: 11.5, cursor: syncing ? "default" : "pointer", opacity: syncing ? 0.7 : 1 }}>
+              {syncing ? "Updating…" : "Update"}
+            </button>
+          )}
+        </div>
       </div>
       <div style={{ display: "flex", gap: 18, fontSize: 12, color: C.textMuted, marginBottom: 18 }}>
         <span>{img.registry}</span>
@@ -125,7 +138,7 @@ export default function ImageDetailPage() {
               {["Package", "Version", "Type", "License", "Source", "Status"].map(h => <div key={h} style={TH}>{h}</div>)}
             </div>
             {filteredPkgs.map(pkg => {
-              const typeColor = PKG_COLORS[pkg.pkg_type] ?? { bg: C.card, fg: C.textSub };
+              const typeColor = PKG_COLORS[pkg.pkg_type ?? ""] ?? { bg: C.card, fg: C.textSub };
               return (
                 <div key={pkg.name} style={{ display: "grid", gridTemplateColumns: pkgCols, padding: "11px 16px", borderBottom: `1px solid ${C.borderRow}`, alignItems: "center" }}>
                   <div style={{ fontSize: 12.5, fontFamily: "ui-monospace,monospace" }}>{pkg.name}</div>
