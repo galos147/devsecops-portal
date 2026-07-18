@@ -9,14 +9,16 @@ from app.models.image_package import ImagePackage
 from app.models.code_project import CodeProject
 from app.models.code_issue import CodeIssue
 from app.models.pipeline_run import PipelineRun
+from app.models.dependency_track_project import DependencyTrackProject
 from app.schemas.integration import IntegrationOut, IntegrationUpdate, TestConnectionRequest, TestConnectionResult
-from app.integrations import config_resolver, jfrog, sonarqube, prisma, gitlab
+from app.integrations import config_resolver, jfrog, sonarqube, prisma, gitlab, dependency_track
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
-LABELS = {"jfrog": "JFrog Xray", "sonarqube": "SonarQube", "prisma": "Prisma Cloud", "gitlab": "GitLab"}
+LABELS = {"jfrog": "JFrog Xray", "sonarqube": "SonarQube", "prisma": "Prisma Cloud", "gitlab": "GitLab", "dependency_track": "Dependency-Track"}
 TEST_FUNCTIONS = {"jfrog": jfrog.test_connection, "sonarqube": sonarqube.test_connection,
-                   "prisma": prisma.test_connection, "gitlab": gitlab.test_connection}
+                   "prisma": prisma.test_connection, "gitlab": gitlab.test_connection,
+                   "dependency_track": dependency_track.test_connection}
 VALID_TOOLS = set(LABELS)
 
 
@@ -107,6 +109,12 @@ def delete_integration_data(tool: str, db: Session = Depends(get_db)):
 
     elif tool == "gitlab":
         deleted += db.query(PipelineRun).filter(PipelineRun.is_seed == True).delete(synchronize_session=False)  # noqa: E712
+
+    elif tool == "dependency_track":
+        project_ids = [row[0] for row in db.query(DependencyTrackProject.id).filter(DependencyTrackProject.is_seed == True).all()]  # noqa: E712
+        if project_ids:
+            deleted += db.query(Vulnerability).filter(Vulnerability.dt_project_id.in_(project_ids)).delete(synchronize_session=False)
+            deleted += db.query(DependencyTrackProject).filter(DependencyTrackProject.id.in_(project_ids)).delete(synchronize_session=False)
 
     db.commit()
     return {"tool": tool, "deleted": deleted}

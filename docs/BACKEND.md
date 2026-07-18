@@ -30,7 +30,7 @@ app/
 | `auth.py` | `/api/auth` | **public** (login must stay reachable) | login, logout, `/me` |
 | `dashboard.py` | `/api/dashboard` | any logged-in user | KPI/summary aggregation across all synced data |
 | `images.py` | `/api/images` | any logged-in user | image list/detail/packages, the on-demand per-image JFrog sync |
-| `vulnerabilities.py` | `/api/vulnerabilities` | any logged-in user | CVE list/detail grouped across images |
+| `vulnerabilities.py` | `/api/vulnerabilities` | any logged-in user | CVE list/detail grouped across images and Dependency-Track software projects |
 | `code_quality.py` | `/api` (`/projects`, `/code-issues`, `/rules/*`) | any logged-in user | SonarQube projects/issues, rule info (sanitized HTML) |
 | `pipelines.py` | `/api/pipelines` | any logged-in user | GitLab pipeline list |
 | `search.py` | `/api/search` | any logged-in user | fan-out search across images/CVEs/issues/pipelines |

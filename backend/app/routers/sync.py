@@ -4,17 +4,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db, SessionLocal
 from app.models.sync_job import SyncJob
-from app.integrations import config_resolver, jfrog, sonarqube, prisma, gitlab
+from app.integrations import config_resolver, jfrog, sonarqube, prisma, gitlab, dependency_track
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
-VALID_TOOLS = {"jfrog", "sonarqube", "prisma", "gitlab"}
+VALID_TOOLS = {"jfrog", "sonarqube", "prisma", "gitlab", "dependency_track"}
 
 INTEGRATIONS = {
     "jfrog": jfrog.sync,
     "sonarqube": sonarqube.sync,
     "prisma": prisma.sync,
     "gitlab": gitlab.sync,
+    "dependency_track": dependency_track.sync,
 }
 
 # Strong references so background sync tasks aren't garbage-collected mid-run

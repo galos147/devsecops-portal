@@ -5,8 +5,9 @@ from typing import Optional
 from app.database import get_db
 from app.models.vulnerability import Vulnerability
 from app.models.image import Image
+from app.models.dependency_track_project import DependencyTrackProject
 from app.models.fix_suggestion import FixSuggestion
-from app.schemas.vulnerability import VulnGroupOut, CveDetailOut, AffectedImageOut
+from app.schemas.vulnerability import VulnGroupOut, CveDetailOut, AffectedImageOut, AffectedProjectOut
 
 router = APIRouter(prefix="/api/vulnerabilities", tags=["vulnerabilities"])
 
@@ -46,10 +47,14 @@ def list_vulnerabilities(
                 "fixed_version": v.fixed_version,
                 "status": v.status,
                 "source_tool": v.source_tool,
-                "count": 0,
+                "image_count": 0,
+                "project_count": 0,
                 "is_seed": True,
             }
-        groups[v.cve_id]["count"] += 1
+        if v.image_id:
+            groups[v.cve_id]["image_count"] += 1
+        if v.dt_project_id:
+            groups[v.cve_id]["project_count"] += 1
         groups[v.cve_id]["is_seed"] = groups[v.cve_id]["is_seed"] and v.is_seed
 
     return [
@@ -58,7 +63,8 @@ def list_vulnerabilities(
             severity=g["severity"],
             cvss_score=g["cvss_score"],
             description=g["description"],
-            affected_images=g["count"],
+            affected_images=g["image_count"],
+            affected_projects=g["project_count"],
             fixed_version=g["fixed_version"],
             status=g["status"],
             source_tool=g["source_tool"],
@@ -78,15 +84,26 @@ def get_cve_detail(cve_id: str, db: Session = Depends(get_db)):
     v0 = vulns[0]
 
     affected = []
+    affected_projects = []
     for v in vulns:
-        img = db.query(Image).filter(Image.id == v.image_id).first()
-        if img:
-            affected.append(AffectedImageOut(
-                id=img.id, name=img.name, tag=img.tag,
-                installed_version=v.installed_version,
-                fixed_version=v.fixed_version,
-                status=v.status,
-            ))
+        if v.image_id:
+            img = db.query(Image).filter(Image.id == v.image_id).first()
+            if img:
+                affected.append(AffectedImageOut(
+                    id=img.id, name=img.name, tag=img.tag,
+                    installed_version=v.installed_version,
+                    fixed_version=v.fixed_version,
+                    status=v.status,
+                ))
+        elif v.dt_project_id:
+            proj = db.query(DependencyTrackProject).filter(DependencyTrackProject.id == v.dt_project_id).first()
+            if proj:
+                affected_projects.append(AffectedProjectOut(
+                    id=proj.id, name=proj.name, version=proj.version,
+                    installed_version=v.installed_version,
+                    fixed_version=v.fixed_version,
+                    status=v.status,
+                ))
 
     return CveDetailOut(
         cve_id=cve_id,
@@ -99,4 +116,5 @@ def get_cve_detail(cve_id: str, db: Session = Depends(get_db)):
         suggestion=fix.suggestion_text if fix else None,
         copy_cmd=fix.copy_cmd if fix else None,
         affected_images=affected,
+        affected_projects=affected_projects,
     )
