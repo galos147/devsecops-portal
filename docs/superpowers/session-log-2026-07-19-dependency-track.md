@@ -1,4 +1,4 @@
-# Session log — 2026-07-19 — Dependency-Track integration, Tasks 6–10
+# Session log — 2026-07-19 — Dependency-Track integration, Tasks 6–12
 
 Continuation of the Dependency-Track integration
 (spec: `specs/2026-07-18-dependency-track-design.md`,
@@ -106,16 +106,50 @@ only PURLs and DT's built-in Internal Analyzer matches via CPE. Real
 PURL-based matching needs OSS Index (free external account + API token,
 not set up). This is not a sync bug.
 
+## Task 11 — End-to-end verification (operational)
+
+The post-reset NVD mirror turned out to be *incrementally* stale: the
+feed files on the volume survived the H2 reset, so the boot-time mirror
+considered itself current and skipped re-parsing old years — the fresh
+database only ever received 2026-era CVEs. Forced a full re-mirror by
+deleting `/data/.dependency-track/nist` inside the container and
+restarting (~15 min), then triggered
+`POST /api/v1/finding/project/{uuid}/analyze` on both projects.
+
+Result: `test-project` shows **10 real findings** in DT — CVE-2021-44228
+and CVE-2021-45046 (critical, Log4Shell family), CVE-2021-44832,
+CVE-2021-45105, CVE-2025-68161, and five 2026 log4j CVEs (all medium).
+The portal's final sync pulled exactly 10 records; the DB and API CVE
+lists match DT's own findings ID-for-ID. `webhook-relay` correctly syncs
+with 0 findings (the PURL/CPE caveat). Spot-checks on images /
+code-quality / pipelines pages: all unchanged and loading.
+
+Unplanned bonus test: the user clicked "Remove demo data" for
+Dependency-Track (and SonarQube) in the Settings UI mid-session — the
+Task 5 `DELETE /api/integrations/{tool}/data` branch deleted only the
+`is_seed=true` demo rows and left every real synced row intact, exactly
+as designed.
+
+## Task 12 — Documentation (commit `f237333`)
+
+`docs/integrations.md` gained section
+`## 12. Dependency-Track: SBOM-based dependency vulnerability tracking`:
+architecture, the `dt_project_id`/`image_id` data-model split, the
+confirmed API field names (no corrections needed — the payoff of
+capturing the real API in Task 2 before writing the parser), both real
+CI bugs (CycloneDX 1.7 pin, empty-SBOM/`requirements.txt`), the PURL/CPE
+analyzer caveat with the OSS Index alternative, per-commit project
+versioning, and the H2-reset/NVD-mirror recovery runbook. Review clean,
+including an explicit credential-leak scan (no key/password values in
+the docs).
+
 ## State at end of session
 
-- Tasks 1–10 complete and reviewed; ledger in
-  `.superpowers/sdd/progress.md`.
-- Spot-checks pass: images (12), code projects (8), pipelines (10), all
-  portal pages load — existing integrations untouched.
-- Waiting on DT's NVD mirror to reach 2021-era CVEs, then:
-  **Task 11** (final end-to-end sync + verification) and **Task 12**
-  (document the integration in `docs/integrations.md`), followed by the
-  final whole-branch review.
+- **All 12 tasks complete and reviewed**; ledger in
+  `.superpowers/sdd/progress.md`. Remaining: final whole-branch review.
+- The integration is live end to end: GitLab CI (Trivy) → SBOM →
+  Dependency-Track → portal sync → `/vulnerabilities` page, all
+  verified against real data.
 
 ## Credentials quick reference (values not committed)
 
