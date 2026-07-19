@@ -1,5 +1,6 @@
 stages:
   - validate
+  - test
 
 sonar-validate:
   stage: validate
@@ -11,3 +12,24 @@ sonar-validate:
     - sonar-scanner
   tags:
     - local
+
+sbom-scan:
+  stage: test
+  image:
+    # Pinned: trivy >= 0.67 emits CycloneDX 1.7, which Dependency-Track
+    # 4.14 rejects ("Unrecognized specVersion 1.7"); 0.58.0 emits 1.6.
+    name: aquasec/trivy:0.58.0
+    entrypoint: [""]
+  script:
+    - trivy fs --format cyclonedx -o sbom.json .
+    - apk add --no-cache curl
+    - >
+      curl --fail-with-body -X POST "$DEPENDENCY_TRACK_URL/api/v1/bom"
+      -H "X-Api-Key: $DEPENDENCY_TRACK_API_KEY"
+      -F "autoCreate=true"
+      -F "projectName=webhook-relay"
+      -F "projectVersion=$CI_COMMIT_SHORT_SHA"
+      -F "bom=@sbom.json"
+  tags:
+    - local
+  allow_failure: true
