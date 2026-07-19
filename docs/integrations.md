@@ -798,6 +798,201 @@ tested as two **independent** scenarios (a multi-admin dance to isolate the last
 arithmetic from the self-delete check, since demoting/deleting yourself would otherwise
 always trip the self-guard first regardless of admin count).
 
+## 12. Dependency-Track: SBOM-based dependency vulnerability tracking
+
+A fifth tool integration, and a different shape from the first four: JFrog Xray
+scans **container images** the portal already knows about (section 10);
+[Dependency-Track](https://dependencytrack.org/) scans **open-source
+dependencies** via a Software Bill of Materials (SBOM), which the portal
+never generates itself. The portal only ever reads Dependency-Track's REST
+API after the fact — the same read-only shape every other integration in
+this app uses.
+
+**Architecture.** GitLab CI (not the portal) runs Trivy to produce a
+CycloneDX SBOM and uploads it directly to Dependency-Track's own
+`POST /api/v1/bom`, with `autoCreate=true` so Dependency-Track creates the
+project on first upload. Dependency-Track then runs its own vulnerability
+analysis against that SBOM in the background. `backend/app/integrations/dependency_track.py`'s
+`sync()` never touches an SBOM or a scanner — it does two things, once per
+sync:
+
+1. `GET /api/v1/project` (paginated, `pageSize=100`) — list every project
+   Dependency-Track knows about, upsert into a new `DependencyTrackProject`
+   table.
+2. For each project with `lastBomImport` set (i.e. an SBOM has actually been
+   imported), `GET /api/v1/finding/project/{uuid}` — upsert into
+   `vulnerabilities`.
+
+Full re-sync of findings per project on every run, no incremental watermark
+— finding lists here are small, unlike JFrog's ~2M-artifact scale (section
+10), so the extra machinery isn't justified yet.
+
+**Data-model split: `dt_project_id` vs `image_id`.** Rather than a parallel
+table, Dependency-Track findings live in the *same* `vulnerabilities` table
+JFrog Xray already writes to. `Vulnerability` gained a nullable
+`dt_project_id` (FK to the new `dependency_track_projects` table) alongside
+the existing nullable `image_id` (FK to `images`) — the two are mutually
+exclusive per row, never both set: a JFrog finding has `image_id` and
+`dt_project_id=NULL`; a Dependency-Track finding has `dt_project_id` and
+`image_id=NULL`. `image_id` was made nullable specifically to allow this
+(previously `NOT NULL`, since every vulnerability used to belong to an
+image). The frontend's affected-count cell and CVE-detail "Affected
+Projects" table (built in Task 6/7) both key off which of the two is set,
+so one CVE can show combined "N images, M projects" counts without a UNION
+query — `VulnGroupOut.affected_projects` and the new `AffectedProjectOut`
+schema (`id`, `name`, `version`, `installed_version`, `fixed_version`,
+`status`) sit alongside the pre-existing `affected_images`/`AffectedImageOut`.
+
+**Confirmed API field names** — captured from a real local Dependency-Track
+4.14.2 instance *before* the parser was written (same discipline the JFrog
+Reports API correction in section 10 argues for), so unlike that section,
+**no field-name corrections were needed** — every field the plan assumed
+matched the real response exactly:
+
+```json
+// GET /api/v1/project
+{"uuid": "...", "name": "test-project", "version": "1.0.0", "lastBomImport": 1784394010064}
+
+// GET /api/v1/finding/project/{uuid}
+{
+  "component": {"name": "log4j-core", "version": "2.14.1", "purl": "...", "cpe": "..."},
+  "vulnerability": {
+    "vulnId": "CVE-2021-44228", "source": "NVD",
+    "severity": "CRITICAL", "cvssV3BaseScore": 10.0, "cvssV2BaseScore": 9.3,
+    "description": "..."
+  },
+  "analysis": {"isSuppressed": false}
+}
+```
+
+`vulnerability.severity` is an uppercase string (`CRITICAL`/`HIGH`/`MEDIUM`/
+`LOW`/`INFO`/`UNASSIGNED`) mapped down via `_SEVERITY_MAP`; `INFO` and
+`UNASSIGNED` both fold to `low` since this app's `Severity` enum only has
+four levels. CVSS prefers `cvssV3BaseScore`, falling back to
+`cvssV2BaseScore`. `lastBomImport` is `null` until a project's first SBOM
+upload — that's the signal `sync()` uses to skip the findings call for
+projects that exist but have nothing scanned yet.
+
+**Real CI bugs found and fixed (`sample-projects/webhook-relay/.gitlab-ci.yml`,
+also mirrored to the GitLab.com copy of the repo):**
+
+```yaml
+sbom-scan:
+  stage: test
+  image:
+    name: aquasec/trivy:0.58.0   # pinned — see below
+    entrypoint: [""]
+  script:
+    - trivy fs --format cyclonedx -o sbom.json .
+    - apk add --no-cache curl
+    - >
+      curl --fail-with-body -X POST "$DEPENDENCY_TRACK_URL/api/v1/bom"
+      -H "X-Api-Key: $DEPENDENCY_TRACK_API_KEY"
+      -F "autoCreate=true" -F "projectName=webhook-relay"
+      -F "projectVersion=$CI_COMMIT_SHORT_SHA" -F "bom=@sbom.json"
+  tags: [local]
+  allow_failure: true
+```
+
+1. **CycloneDX version mismatch.** `aquasec/trivy:latest` emits CycloneDX
+   1.7; Dependency-Track 4.14 rejects it outright with
+   `400 "Unrecognized specVersion 1.7"`. Fixed by pinning
+   `aquasec/trivy:0.58.0`, which emits 1.6 — verified accepted by a local
+   rehearsal upload before pushing. Bumping the image tag later without
+   re-checking DT's supported spec versions will silently reintroduce this.
+2. **Empty SBOM.** `webhook-relay` had no dependency manifest at all, so
+   `trivy fs` found zero components to enumerate — an empty BOM isn't a
+   sync bug, it's Trivy having nothing to scan. Fixed by adding
+   `sample-projects/webhook-relay/requirements.txt` with deliberately old
+   pins (`requests==2.25.1`, `urllib3==1.26.4`) purely so there's something
+   real for Trivy to find.
+
+Two deviations from the original plan, both necessary once real GitLab CI was
+in the loop: `tags: [local]` (GitLab.com's shared runners have no route to
+the local Dependency-Track container — same constraint as the SonarQube job
+in section 7) and `curl --fail-with-body` (so a rejected upload fails the
+job visibly in the log instead of a silent 400 that `allow_failure: true`
+would otherwise paper over as "succeeded").
+
+**Honest caveat: PURL vs. CPE matching.** Predicted during the Task 2
+rehearsal and confirmed for real in the first live CI run:
+`webhook-relay`'s `requirements.txt`-derived components carry a `purl` but
+no `cpe` — Trivy's CycloneDX output is primarily PURL-based. Dependency-Track's
+built-in **Internal Analyzer** matches almost exclusively via CPE, so a
+PURL-only component produces **zero findings**, even against a fully
+mirrored NVD database. This is not a sync bug and there's nothing in
+`dependency_track.py` to fix — the portal correctly reports what
+Dependency-Track itself found, which is nothing, because it wasn't asked to
+match the way Trivy's output is shaped. The real fix is enabling
+**OSS Index** (Sonatype's free PURL-based analyzer), which needs a free
+external account and API token — deliberately not set up for this
+environment, matching this repo's existing pattern of documenting a gap
+rather than half-implementing an external signup flow (compare the GitLab.com
+identity-verification caveat in section 7).
+
+By contrast, `test-project`'s SBOM was hand-built with an explicit `cpe`
+field (`cpe:2.3:a:apache:log4j:2.14.1:*:*:*:*:*:*:*`) specifically to prove
+the Internal Analyzer path end-to-end, and after a full NVD re-mirror (see
+below) it shows **10 real findings**: CVE-2021-44228 and CVE-2021-45046
+(critical), CVE-2021-44832 and CVE-2021-45105 (medium), CVE-2025-68161
+(medium), and five 2026-era log4j CVEs (CVE-2026-34477/34479/34480/34481/
+49844, all medium). A final sync pulled all 10 into the portal's own DB,
+and the portal API's CVE list matches Dependency-Track's ID-by-ID.
+
+**Known behavior: one Dependency-Track project per commit.** The CI job
+uploads with `autoCreate=true` and `projectVersion=$CI_COMMIT_SHORT_SHA`, so
+every pushed commit that runs the pipeline creates a **new** Dependency-Track
+project (`webhook-relay` v=`<sha>`) rather than overwriting one project in
+place — this mirrors Dependency-Track's own data model, where a project's
+identity is `name` + `version` together. The portal's `sync()` picks up each
+one as its own `DependencyTrackProject` row with its own `dt_project_id`, so
+the portal's project/finding list grows by one row set per pipeline run
+unless old Dependency-Track projects are pruned manually. Accepted as-is for
+this integration — no dedup-by-name or "latest version only" logic was
+added, since collapsing them would need a policy decision (keep newest?
+keep all for audit history?) outside this task's scope.
+
+**Operational: recovering from a corrupted H2 database / stale NVD mirror.**
+A host reset corrupted Dependency-Track's embedded H2 database — it came
+back with factory-reset credentials and an empty portfolio. The subtler part:
+the NVD mirror **data files** on the Docker volume survived the corruption,
+so on restart Dependency-Track's boot-time mirror check saw recent files
+already on disk and considered itself current, skipping the older years
+entirely — leaving the vulnerability database missing everything before
+2026 (e.g. `CVE-2021-44228` returned `404` from
+`GET /api/v1/vulnerability/source/NVD/vuln/{id}`, even after re-uploading
+the SBOM). The fix is not "wait for a rescan" — the mirror only pulls what
+it thinks is missing:
+
+```bash
+docker exec devsecops-dependency-track rm -rf /data/.dependency-track/nist
+docker restart devsecops-dependency-track
+# then wait ~15 minutes for the full year-by-year re-mirror to complete
+# (watch docker logs devsecops-dependency-track for mirroring progress)
+```
+
+Deleting the NVD cache directory forces a genuine full re-mirror instead of
+an incremental "what changed since last time" pull. Once it completes,
+existing projects need to be told to re-run analysis against the now-complete
+vulnerability data — it doesn't happen automatically for BOMs already
+imported:
+
+```bash
+curl -X POST "$DT_URL/api/v1/finding/project/{uuid}/analyze" -H "X-Api-Key: ..."
+```
+
+This is what took `test-project` from 2 findings (2026-era CVEs only, from
+the still-rebuilding mirror) to the real, complete 10.
+
+**Files:** `backend/app/models/dependency_track_project.py`,
+`backend/app/models/vulnerability.py` (`image_id` made nullable,
+`dt_project_id` added), `backend/app/integrations/dependency_track.py`,
+`backend/app/schemas/vulnerability.py` (`AffectedProjectOut`),
+`backend/app/routers/{sync,vulnerabilities,integrations}.py`,
+`frontend/lib/api.ts`, `frontend/lib/integrations/config.ts`,
+`frontend/app/vulnerabilities/*`, `backend/seed.py`,
+`sample-projects/webhook-relay/{.gitlab-ci.yml,requirements.txt}`.
+
 ## Not done / stubbed
 
 - Prisma Cloud `sync()` is still a 3-line stub — only `test_connection()` is
