@@ -64,6 +64,23 @@ export default function CveDetailPage() {
           </button>
         </div>
       </div>
+
+      {cve.affected_projects.length > 0 && (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", marginTop: 16 }}>
+          <div style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, borderBottom: `1px solid ${C.borderLight}` }}>Affected Projects</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 0.9fr 0.9fr 0.8fr", padding: "9px 16px", borderBottom: `1px solid ${C.borderLight}` }}>
+            {["Project", "Installed", "Fixed", "Status"].map(h => <div key={h} style={TH}>{h}</div>)}
+          </div>
+          {cve.affected_projects.map(proj => (
+            <div key={proj.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 0.9fr 0.9fr 0.8fr", padding: "11px 16px", borderBottom: `1px solid ${C.borderRow}`, alignItems: "center" }}>
+              <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 12.5 }}>{proj.name}{proj.version ? `:${proj.version}` : ""}</div>
+              <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: C.textSub }}>{proj.installed_version}</div>
+              <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: "oklch(0.65 0.13 150)" }}>{proj.fixed_version ?? "—"}</div>
+              <div style={{ fontSize: 12, color: C.textMuted, textTransform: "capitalize" }}>{proj.status}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -63,6 +63,7 @@ export default function VulnerabilitiesPage() {
         </select>
         <select value={source} onChange={e => setSource(e.target.value)} style={filterStyle}>
           <option value="all">All tools</option><option value="jfrog">JFrog</option><option value="prisma">Prisma</option>
+          <option value="dependency_track">Dependency-Track</option>
         </select>
       </div>
 
@@ -85,7 +86,11 @@ export default function VulnerabilitiesPage() {
             <SeverityBadge sev={v.severity} />
             <div style={{ fontSize: 12.5, fontFamily: "ui-monospace,monospace" }}>{v.cvss_score}</div>
             <div style={{ fontSize: 12.5, color: C.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.description}</div>
-            <div style={{ fontSize: 12.5 }}>{v.affected_images} images</div>
+            <div style={{ fontSize: 12.5 }}>
+              {v.affected_images > 0 && `${v.affected_images} image${v.affected_images === 1 ? "" : "s"}`}
+              {v.affected_images > 0 && v.affected_projects > 0 && ", "}
+              {v.affected_projects > 0 && `${v.affected_projects} project${v.affected_projects === 1 ? "" : "s"}`}
+            </div>
             <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: "oklch(0.65 0.13 150)" }}>{v.fixed_version ?? "—"}</div>
             <div style={{ fontSize: 12, color: C.textMuted, textTransform: "capitalize" }}>{v.status}</div>
           </div>
