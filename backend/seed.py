@@ -16,6 +16,7 @@ from app.models.sync_job import SyncJob
 from app.models.image_package import ImagePackage
 from app.models.service import Service
 from app.models.user import User
+from app.models.dependency_track_project import DependencyTrackProject
 from app.auth import hash_password
 import uuid
 
@@ -162,6 +163,18 @@ SYNC_JOBS = [
     {"id": "sj-2", "tool": "sonarqube", "status": "success", "started_at": "2026-07-15T09:28:00", "finished_at": "2026-07-15T09:30:00", "records_synced": 96, "error_message": None},
     {"id": "sj-3", "tool": "prisma", "status": "failed", "started_at": "2026-07-15T07:00:00", "finished_at": "2026-07-15T07:00:05", "records_synced": 0, "error_message": "Authentication failed: check PRISMA_ACCESS_KEY and PRISMA_SECRET_KEY"},
     {"id": "sj-4", "tool": "gitlab", "status": "success", "started_at": "2026-07-15T09:13:00", "finished_at": "2026-07-15T09:15:00", "records_synced": 210, "error_message": None},
+    {"id": "sj-5", "tool": "dependency_track", "status": "success", "started_at": "2026-07-15T09:28:00", "finished_at": "2026-07-15T09:29:00", "records_synced": 2, "error_message": None},
+]
+
+DEPENDENCY_TRACK_PROJECTS = [
+    {"id": "dtp-1", "name": "webhook-relay", "version": "1.0.0"},
+]
+
+DT_VULNERABILITIES = [
+    {"id": "dt-seed-1", "dt_project_id": "dtp-1", "cve_id": "CVE-2021-44228", "severity": "critical",
+     "package_name": "log4j-core", "installed_version": "2.14.1", "fixed_version": "2.17.1",
+     "cvss_score": 10.0, "description": "Log4Shell — remote code execution via JNDI lookup in log message rendering.",
+     "source_tool": "dependency_track", "status": "open"},
 ]
 
 
@@ -196,6 +209,23 @@ def seed():
         for d in VULNERABILITIES:
             db.add(Vulnerability(
                 id=d["id"], image_id=d["image_id"], cve_id=d["cve_id"],
+                severity=d["severity"], package_name=d["package_name"],
+                installed_version=d["installed_version"], fixed_version=d["fixed_version"],
+                cvss_score=d["cvss_score"], description=d["description"],
+                source_tool=d["source_tool"], status=d["status"], is_seed=True,
+            ))
+
+        print("Seeding Dependency-Track projects...")
+        for d in DEPENDENCY_TRACK_PROJECTS:
+            db.add(DependencyTrackProject(
+                id=d["id"], name=d["name"], version=d["version"],
+                last_synced_at=datetime.utcnow(), is_seed=True,
+            ))
+
+        print("Seeding Dependency-Track vulnerabilities...")
+        for d in DT_VULNERABILITIES:
+            db.add(Vulnerability(
+                id=d["id"], image_id=None, dt_project_id=d["dt_project_id"], cve_id=d["cve_id"],
                 severity=d["severity"], package_name=d["package_name"],
                 installed_version=d["installed_version"], fixed_version=d["fixed_version"],
                 cvss_score=d["cvss_score"], description=d["description"],
