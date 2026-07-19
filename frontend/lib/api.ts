@@ -70,9 +70,10 @@ export interface VulnCount { critical: number; high: number; medium: number; low
 export interface ImageOut { id: string; name: string; tag: string; registry: string; digest?: string; size_mb?: number; last_scanned_at?: string; source: string; counts: VulnCount; is_seed: boolean }
 export interface VulnOut { id: string; cve_id: string; severity: string; package_name?: string; installed_version?: string; fixed_version?: string; cvss_score?: number; description?: string; source_tool?: string; status: string }
 export interface ImageDetailOut extends ImageOut { vulnerabilities: VulnOut[] }
-export interface VulnGroupOut { cve_id: string; severity: string; cvss_score?: number; description?: string; affected_images: number; fixed_version?: string; status: string; source_tool?: string; is_seed: boolean }
+export interface VulnGroupOut { cve_id: string; severity: string; cvss_score?: number; description?: string; affected_images: number; affected_projects: number; fixed_version?: string; status: string; source_tool?: string; is_seed: boolean }
 export interface AffectedImageOut { id: string; name: string; tag: string; installed_version?: string; fixed_version?: string; status: string }
-export interface CveDetailOut { cve_id: string; severity: string; cvss_score?: number; description?: string; published?: string; cvss_vector?: string; advisory_url?: string; suggestion?: string; copy_cmd?: string; affected_images: AffectedImageOut[] }
+export interface AffectedProjectOut { id: string; name: string; version?: string; installed_version?: string; fixed_version?: string; status: string }
+export interface CveDetailOut { cve_id: string; severity: string; cvss_score?: number; description?: string; published?: string; cvss_vector?: string; advisory_url?: string; suggestion?: string; copy_cmd?: string; affected_images: AffectedImageOut[]; affected_projects: AffectedProjectOut[] }
 export interface FixSuggestionOut { cve_id: string; suggestion_text?: string; copy_cmd?: string; advisory_url?: string; published?: string; cvss_vector?: string }
 export interface CodeProjectOut { id: string; project_key: string; name: string; quality_gate?: string; bugs: number; vulnerabilities: number; code_smells: number; coverage: number; hotspots: number; sonar_url?: string; is_seed: boolean }
 export interface CodeIssueOut { id: string; project_key: string; project_name?: string; rule_id?: string; type?: string; severity?: string; message?: string; file_path?: string; line_number?: number; status?: string; effort?: string; is_seed: boolean }
