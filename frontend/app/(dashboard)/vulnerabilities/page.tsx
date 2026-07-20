@@ -73,7 +73,7 @@ export default function VulnerabilitiesPage() {
           <div style={{ ...TH, cursor: "pointer" }} onClick={() => toggleSort("severity")}>Severity{caret("severity")}</div>
           <div style={{ ...TH, cursor: "pointer" }} onClick={() => toggleSort("cvss")}>CVSS{caret("cvss")}</div>
           <div style={TH}>Description</div>
-          <div style={TH}>Affected Images</div>
+          <div style={TH}>Affected</div>
           <div style={TH}>Fixed Version</div>
           <div style={TH}>Status</div>
         </div>

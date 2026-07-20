@@ -820,12 +820,30 @@ sync:
    Dependency-Track knows about, upsert into a new `DependencyTrackProject`
    table.
 2. For each project with `lastBomImport` set (i.e. an SBOM has actually been
-   imported), `GET /api/v1/finding/project/{uuid}` — upsert into
-   `vulnerabilities`.
+   imported), `GET /api/v1/finding/project/{uuid}?suppressed=true` — upsert
+   into `vulnerabilities`. `suppressed=true` matters: Dependency-Track's
+   finding endpoint excludes suppressed findings by default, so without it
+   `analysis.isSuppressed` would never be true and a finding suppressed in
+   Dependency-Track would stay "open" in the portal forever. With it set,
+   the response contains both suppressed and unsuppressed findings, and
+   the portal maps `analysis.isSuppressed` to the portal's own
+   `status: "suppressed"`.
 
 Full re-sync of findings per project on every run, no incremental watermark
 — finding lists here are small, unlike JFrog's ~2M-artifact scale (section
-10), so the extra machinery isn't justified yet.
+10), so the extra machinery isn't justified yet. Unlike an incremental
+watermark, "full re-sync" here also means a real reconciliation, not just
+an upsert: after a project's findings call succeeds, any portal
+`Vulnerability` row for that `dt_project_id` that *isn't* in the fresh
+response anymore (component removed by a newer BOM, CVE withdrawn, etc.)
+is deleted, and after the project loop, any portal `DependencyTrackProject`
+no longer present in Dependency-Track's own project list is deleted too
+(along with its vulnerabilities). Both reconciliation steps skip demo/seed
+rows (`is_seed=True`) unconditionally, and skip any project whose findings
+call failed or that has no BOM yet — reconciliation only ever acts on data
+just confirmed current, never on a guess. A project whose findings fetch
+fails is recorded in the sync result (`note`) rather than silently
+dropped, without aborting the rest of the run.
 
 **Data-model split: `dt_project_id` vs `image_id`.** Rather than a parallel
 table, Dependency-Track findings live in the *same* `vulnerabilities` table
@@ -946,11 +964,19 @@ project (`webhook-relay` v=`<sha>`) rather than overwriting one project in
 place — this mirrors Dependency-Track's own data model, where a project's
 identity is `name` + `version` together. The portal's `sync()` picks up each
 one as its own `DependencyTrackProject` row with its own `dt_project_id`, so
-the portal's project/finding list grows by one row set per pipeline run
-unless old Dependency-Track projects are pruned manually. Accepted as-is for
-this integration — no dedup-by-name or "latest version only" logic was
-added, since collapsing them would need a policy decision (keep newest?
-keep all for audit history?) outside this task's scope.
+the portal's project/finding list grows by one row set per pipeline run —
+this is Dependency-Track-side accumulation, still true, and still Accepted
+as-is: no dedup-by-name or "latest version only" logic was added, since
+collapsing them would need a policy decision (keep newest? keep all for
+audit history?) outside this task's scope. What's no longer true is that
+this accumulation ever needed *manual* pruning portal-side: `sync()` now
+reconciles the portal against Dependency-Track on every run (deleting
+portal rows for findings and projects that vanished from Dependency-Track,
+skipping seed/demo rows and any project whose findings fetch failed) — so
+the portal always mirrors Dependency-Track's current state exactly,
+neither drifting stale nor accumulating anything beyond what Dependency-Track
+itself still has. If Dependency-Track's own project list is pruned, the
+next portal sync removes the corresponding rows automatically.
 
 **Operational: recovering from a corrupted H2 database / stale NVD mirror.**
 A host reset corrupted Dependency-Track's embedded H2 database — it came

@@ -17,6 +17,7 @@ TOOL_LABELS = {
     "sonarqube": "SonarQube",
     "prisma": "Prisma Cloud",
     "gitlab": "GitLab",
+    "dependency_track": "Dependency-Track",
 }
 
 
@@ -49,7 +50,7 @@ def get_stats(db: Session = Depends(get_db)):
     last_sync = last_sync_row.finished_at.isoformat() if last_sync_row and last_sync_row.finished_at else None
 
     tool_health = []
-    for tool in ["jfrog", "sonarqube", "prisma", "gitlab"]:
+    for tool in ["jfrog", "sonarqube", "prisma", "gitlab", "dependency_track"]:
         row = db.query(SyncJob).filter(SyncJob.tool == tool).order_by(SyncJob.finished_at.desc()).first()
         connected = config_resolver.resolve(db, tool)["source"] != "none"
         tool_health.append(ToolHealth(
@@ -63,7 +64,10 @@ def get_stats(db: Session = Depends(get_db)):
 
     images = db.query(Image).all()
     image_vuln_counts = {}
-    for v in db.query(Vulnerability).filter(Vulnerability.status == "open").all():
+    for v in db.query(Vulnerability).filter(
+        Vulnerability.status == "open",
+        Vulnerability.image_id.isnot(None),
+    ).all():
         c = image_vuln_counts.setdefault(v.image_id, {"critical": 0, "high": 0, "medium": 0, "low": 0})
         c[v.severity] = c.get(v.severity, 0) + 1
 
