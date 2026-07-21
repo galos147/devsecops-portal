@@ -67,6 +67,24 @@ CI runner setup, see `docs/integrations.md`.
 - **Frontend** — Next.js 14 + TypeScript (`frontend/package.json`)
 - **Runtime** — `docker-compose.yml` (`db` + `backend` + `frontend`, hot-reload in dev)
 
+## Container images
+
+`backend` and `frontend` are built and pushed to GitHub Container Registry on
+every push to `main` (`.github/workflows/docker-publish.yml`) — pull them
+directly instead of building locally:
+
+| Image | Pull |
+|---|---|
+| Backend | `docker pull ghcr.io/galos147/devsecops-portal-backend:latest` |
+| Frontend | `docker pull ghcr.io/galos147/devsecops-portal-frontend:latest` |
+| Postgres (`db`) | `docker pull postgres:16-alpine` — public upstream image from Docker Hub, not built by this repo |
+
+All tags (`latest`, per-commit SHA, per-branch) are listed at
+https://github.com/galos147?tab=packages. GHCR packages default to
+**private** — if a pull fails with an auth error, either run
+`docker login ghcr.io` with a PAT that has `read:packages`, or make the
+package public from its GitHub package settings.
+
 ## Project layout
 
 ```
